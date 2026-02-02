@@ -7,7 +7,17 @@ const yts = require('yt-search');
 const { default: makeWASocket, useMultiFileAuthState, downloadContentFromMessage, fetchLatestBaileysVersion, DisconnectReason, delay } = require('@whiskeysockets/baileys');
 const pino = require("pino");
 const readline = require("readline");
-global.realOwners = global.realOwners || [];
+const fetch = require('node-fetch'); // Necesario para XNXX y otros
+
+// ==========================================
+// 👑 CONFIGURACIÓN CENTRAL (AQUÍ CAMBIAS TODO)
+// ==========================================
+const ownerData = {
+    numero: "526633147534",  // Tu número principal
+    lid: "191809682694179",  // Tu ID técnico (LID)
+    nombre: "Criss",         // Tu nombre
+    botName: "Crissbot"      // Nombre del Bot
+};
 
 let botActivo = true; 
 
@@ -118,17 +128,13 @@ async function iniciarBot() {
             } catch (e) {}
             const BotName = configBot.nombre; 
 
-            // ==========================================
-            // 👮‍♂️ SEGURIDAD: DEFINIR OWNER
-            // ==========================================
-            const miNumero = "526633147534@s.whatsapp.net";
-            const miLID = "191809682694179@lid";
-            
-            const esOwner = m.sender === miNumero || 
-                            m.sender === miLID || 
-                            m.key.fromMe || 
-                            m.sender.includes("5216633147534") || 
-                            (global.realOwners && global.realOwners.includes(m.sender));
+// 👮‍♂️ SEGURIDAD: VERIFICACIÓN CENTRALIZADA
+const esOwner = m.key.fromMe || 
+                sender.includes(ownerData.numero) || 
+                sender.includes(ownerData.lid) || 
+                (global.realOwners && global.realOwners.includes(sender));
+
+
 
             // ==========================================
             // 🔋 COMANDO: ENCENDER/APAGAR BOT
@@ -150,6 +156,46 @@ async function iniciarBot() {
             }
 
             if (!botActivo && !esOwner) return; // 🔒 CANDADO FINAL
+
+// ==========================================
+// 🧠 MEMORIA DE XNXX (DETECTOR DE NÚMEROS)
+// ==========================================
+// Inicializamos la memoria si no existe
+global.xnxxSession = global.xnxxSession || {};
+
+// Si el usuario tiene una búsqueda pendiente y escribe un número...
+if (global.xnxxSession[from] && !isNaN(body) && !body.startsWith('.')) {
+    const session = global.xnxxSession[from];
+    const n = parseInt(body.trim());
+
+    // Verificamos si el número es válido en la lista
+    if (n > 0 && n <= session.result.length) {
+        try {
+            await sock.sendMessage(from, { react: { text: "⬇️", key: m.key } });
+            await sock.sendMessage(from, { text: `_📥 Descargando video ${n}... Por favor espera._` }, { quoted: m });
+
+            const link = session.result[n - 1].link;
+            const res = await xnxxdl(link); // Usamos la función de descarga
+            const { qual, views } = res.result.info;
+
+            const txt = `*乂 ¡${BotName} - DOWNLOAD! 乂*\n\n≡ Título : ${res.result.title}\n≡ Duración : ${res.result.duration}\n≡ Calidad : ${qual || 'N/A'}\n≡ Vistas : ${views || 'N/A'}`;
+            
+            const dll = res.result.files.high || res.result.files.low;
+            
+            // Enviamos el video
+            await sock.sendMessage(from, { video: { url: dll }, caption: txt }, { quoted: m });
+            await sock.sendMessage(from, { react: { text: "✅", key: m.key } });
+            
+            // Borramos la sesión para que no se confunda después
+            delete global.xnxxSession[from];
+            return; // Detenemos aquí para que no busque otros comandos
+        } catch (e) {
+            console.error(e);
+            await sock.sendMessage(from, { text: '❌ Error al descargar el video.' }, { quoted: m });
+        }
+    }
+}
+
 
 
             const isGroup = from.endsWith('@g.us');
@@ -186,10 +232,8 @@ async function iniciarBot() {
             
             if (!banco[usuarioKey]) banco[usuarioKey] = 0;
 
-
-
             // ==========================================
-            // 📜 COMANDO: MENU (DISEÑO LIMPIO)
+            // 📜 COMANDO: MENU (CENTRALIZADO Y COMPLETO)
             // ==========================================
             if (body === '.menu' || body === '.help') {
                 await sock.sendMessage(from, { react: { text: "📂", key: m.key } });
@@ -198,7 +242,7 @@ async function iniciarBot() {
                 let saludo = horaActual >= 5 && horaActual < 12 ? "🌅 ¡Buenos días!" : 
                              horaActual >= 12 && horaActual < 19 ? "☀️ ¡Buenas tardes!" : "🌙 ¡Buenas noches!";
 
-                // Imagen o Video
+                // Imagen o Video de Portada
                 let mensajeMenu = {}; 
                 const defaultUrl = 'https://files.catbox.moe/tll9q5.mp4'; 
                 if (fs.existsSync('./media_menu.mp4')) {
@@ -209,16 +253,16 @@ async function iniciarBot() {
                     mensajeMenu = { video: { url: defaultUrl }, gifPlayback: false }; 
                 }
 
-                // --- CABECERA ---
+                // --- CABECERA (Usando ownerData) ---
                 let textoMenu = `✨ *${saludo} ${pushName}* ✨\n\n`;
                 textoMenu += `   ╭── 〔 👤 INFO USUARIO 〕 ──\n`;
-                textoMenu += `   ┃ 👑 *Owner:* Criss\n`; 
-                textoMenu += `   ┃ 🤖 *Bot:* ${BotName}\n`;
+                textoMenu += `   ┃ 👑 *Owner:* ${ownerData.nombre}\n`; 
+                textoMenu += `   ┃ 🤖 *Bot:* ${ownerData.botName}\n`;
                 textoMenu += `   ┃ 🎖️ *Rango:* ${titulos[usuarioKey] || "Novato"}\n`;
                 textoMenu += `   ┃ 💰 *Banco:* $${banco[usuarioKey].toLocaleString()}\n`;
                 textoMenu += `   ╰────────────────────\n\n`;
 
-                // --- SECCIONES ---
+                // --- SECCIONES DE COMANDOS ---
                 
                 textoMenu += `   ╭── 〔 👑 OWNER REAL 〕 ──\n`;
                 textoMenu += `   ┃ 🔹 .owner (nuevo owner)\n`;
@@ -228,10 +272,9 @@ async function iniciarBot() {
                 textoMenu += `   ┃ 🔹 .addcoin (dar dinero)\n`;
                 textoMenu += `   ┃ 🔹 .setname (nombre)\n`;
                 textoMenu += `   ┃ 🔹 .setmenu (portada)\n`;
-                textoMenu += `   ┃ 🔹 .probarwel (test)\n`;
+                textoMenu += `   ┃ 🔹 .subiractu / .actualizar\n`;
                 textoMenu += `   ╰────────────────────\n\n`;
 
-                // --- AQUÍ ESTÁ EL ARREGLO (VERTICAL) ---
                 textoMenu += `   ╭── 〔 👋 BIENVENIDAS 〕 ──\n`;
                 textoMenu += `   ┃ 🚪 *SALIDAS (.welcome)*\n`;
                 textoMenu += `   ┃  • .welcome on/off\n`;
@@ -252,6 +295,7 @@ async function iniciarBot() {
                 textoMenu += `   ┃ 📱 .tt (tiktok clean)\n`;
                 textoMenu += `   ┃ 📌 .pinterest (fotos)\n`;
                 textoMenu += `   ┃ 🎧 .tomp3 (vid a audio)\n`;
+                textoMenu += `   ┃ 🔞 .xnxx (porn search)\n`;
                 textoMenu += `   ╰────────────────────\n\n`;
 
                 textoMenu += `   ╭── 〔 🤖 IA & TOOLS 〕 ──\n`;
@@ -259,7 +303,7 @@ async function iniciarBot() {
                 textoMenu += `   ┃ 🎨 .imagen (dibujar)\n`;
                 textoMenu += `   ┃ 💎 .hd (mejorar calidad)\n`;
                 textoMenu += `   ┃ 🕵️ .mied (ver mi ID)\n`;
-                textoMenu += `   ┃ ℹ️ .info (sistema)\n`;
+                textoMenu += `   ┃ ℹ️ .info / .ping\n`;
                 textoMenu += `   ╰────────────────────\n\n`;
 
                 textoMenu += `   ╭── 〔 🎡 DIVERSIÓN 〕 ──\n`;
@@ -267,6 +311,7 @@ async function iniciarBot() {
                 textoMenu += `   ┃ ✂️ .ppt (juego)\n`;
                 textoMenu += `   ┃ 🔥 .penetrar (rol +18)\n`;
                 textoMenu += `   ┃ 🔞 .tetas (pack)\n`;
+                textoMenu += `   ┃ 🖼️ .s / .sticker\n`;
                 textoMenu += `   ╰────────────────────\n\n`;
 
                 textoMenu += `   ╭── 〔 👮‍♂️ GRUPOS 〕 ──\n`;
@@ -275,10 +320,13 @@ async function iniciarBot() {
                 textoMenu += `   ┃ 👮 .admin (dar poder)\n`;
                 textoMenu += `   ╰────────────────────\n\n`;
 
-                textoMenu += `📍 ${BotName}\n | By Criss_`;
+                // --- FIRMA AUTOMÁTICA ---
+                textoMenu += `📍 ${ownerData.botName}\n | By ${ownerData.nombre}`;
 
                 await sock.sendMessage(from, { ...mensajeMenu, caption: textoMenu }, { quoted: m });
             }
+
+
 
 
 
@@ -339,201 +387,117 @@ async function iniciarBot() {
             // ==========================================
             // 🏷️ COMANDO: SETNAME (Dueño + Admins)
             // ==========================================
-            if (body.startsWith('.setname')) {
-                const groupMetadata = isGroup ? await sock.groupMetadata(from) : null;
-                const participants = isGroup ? groupMetadata.participants : [];
-                const isAdmin = participants.find(p => p.id === sender)?.admin;
-                
-                const tienePermiso = sender.includes("191809682694179") || sender.includes("526633147534") || isAdmin;
-
-                if (!tienePermiso) {
-                     return sock.sendMessage(from, { text: '⛔ Solo el creador o los admins pueden usar esto.' }, { quoted: m });
-                }
-
-                const nuevoNombre = body.slice(9).trim();
-                if (!nuevoNombre) return sock.sendMessage(from, { text: '📝 Escribe el nombre nuevo.' }, { quoted: m });
-
-                try {
-                    const nuevaConfig = { nombre: nuevoNombre };
-                    fs.writeFileSync('./config.json', JSON.stringify(nuevaConfig, null, 2));
-                    await sock.sendMessage(from, { text: `✅ Nombre del bot cambiado a: *${nuevoNombre}*` }, { quoted: m });
-                } catch (e) { console.log(e); }
-            }
-
-
-// ==========================================
-// 👋 COMANDOS: CONFIGURAR DESPEDIDA
-// ==========================================
-const isAdmin = isGroup ? (await sock.groupMetadata(from)).participants.find(p => p.id === sender)?.admin : false;
-
-if (body === '.welcome on' || body === '.welcome off') {
-    if (!esOwner && !isAdmin) return sock.sendMessage(from, { text: '⛔ Solo admins o mi owner pueden usar esto.' }, { quoted: m });
-    welcomeDB.status[from] = body === '.welcome on';
-    guardarWelcome();
-    await sock.sendMessage(from, { text: `✅ Despedidas ${body === '.welcome on' ? 'ACTIVADAS' : 'DESACTIVADAS'}` }, { quoted: m });
-}
-
-if (body === '.setwel') {
-    if (!esOwner && !isAdmin) return;
-    if (welcomeDB.files.length >= 7) return sock.sendMessage(from, { text: '⚠️ Cupos de imagen/video llenos (7/7). Usa .delwe.' }, { quoted: m });
-    const quoted = m.message.extendedTextMessage?.contextInfo?.quotedMessage;
-    const mime = quoted ? Object.keys(quoted)[0] : null;
-    if (mime !== 'imageMessage' && mime !== 'videoMessage') return sock.sendMessage(from, { text: '📸 Responde a una foto o video.' }, { quoted: m });
-
-    const buffer = await downloadContentFromMessage(quoted[mime], mime === 'imageMessage' ? 'image' : 'video');
-    let buf = Buffer.from([]); for await (const chunk of buffer) buf = Buffer.concat([buf, chunk]);
-    const path = `./media_wel_${Date.now()}.${mime === 'imageMessage' ? 'jpg' : 'mp4'}`;
-    fs.writeFileSync(path, buf);
-    welcomeDB.files.push({ path, type: mime === 'imageMessage' ? 'image' : 'video' });
-    guardarWelcome();
-    await sock.sendMessage(from, { text: `✅ Guardado en el cupo #${welcomeDB.files.length}` }, { quoted: m });
-}
-
-if (body === '.welaudi') {
-    if (!esOwner && !isAdmin) return;
-    if (welcomeDB.audios.length >= 4) return sock.sendMessage(from, { text: '⚠️ Cupos de audio llenos (4/4). Usa .delaudio.' }, { quoted: m });
-    const quoted = m.message.extendedTextMessage?.contextInfo?.quotedMessage;
-    if (!quoted || !quoted.videoMessage) return sock.sendMessage(from, { text: '🎥 Responde a un video para extraer su audio.' }, { quoted: m });
-
-    const buffer = await downloadContentFromMessage(quoted.videoMessage, 'video');
-    let buf = Buffer.from([]); for await (const chunk of buffer) buf = Buffer.concat([buf, chunk]);
-    const path = `./audio_wel_${Date.now()}.mp3`;
-    fs.writeFileSync(path, buf);
-    welcomeDB.audios.push(path);
-    guardarWelcome();
-    await sock.sendMessage(from, { text: `🎵 Audio guardado en el cupo #${welcomeDB.audios.length}` }, { quoted: m });
-}
-
-if (body.startsWith('.delwe') || body.startsWith('.delaudio')) {
-    if (!esOwner && !isAdmin) return;
-    const esAudio = body.startsWith('.delaudio');
-    const index = parseInt(body.split(' ')[1]) - 1;
-    const lista = esAudio ? welcomeDB.audios : welcomeDB.files;
-    if (isNaN(index) || !lista[index]) return sock.sendMessage(from, { text: '❌ Número inválido.' }, { quoted: m });
+if (body.startsWith('.setname')) {
+    if (!esOwner) return;
+    const nuevoNombre = body.slice(9).trim();
+    if (!nuevoNombre) return;
     
-    const borrar = esAudio ? lista[index] : lista[index].path;
-    if (fs.existsSync(borrar)) fs.unlinkSync(borrar);
-    lista.splice(index, 1);
-    guardarWelcome();
-    await sock.sendMessage(from, { text: `🗑️ Eliminado correctamente.` }, { quoted: m });
+    ownerData.botName = nuevoNombre; // Actualiza el cerebro del bot
+    await sock.sendMessage(from, { text: `✅ Nombre actualizado a: *${ownerData.botName}*` }, { quoted: m });
+}
+
+// ==========================================
+// 🔞 COMANDO: XNXX (BÚSQUEDA)
+// ==========================================
+if (body.startsWith('.xnxx')) {
+    const text = body.slice(6).trim();
+    if (!text) return sock.sendMessage(from, { text: '❀ Ingresa el nombre o link del video.' }, { quoted: m });
+
+    const isUrl = text.includes('xnxx.com');
+
+    // CASO 1: Es un LINK directo
+    if (isUrl) {
+        try {
+            await sock.sendMessage(from, { react: { text: "🕒", key: m.key } });
+            const res = await xnxxdl(text);
+            const { qual, views } = res.result.info;
+            const txt = `*乂 ¡${BotName} - DOWNLOAD! 乂*\n\n≡ Título : ${res.result.title}\n≡ Duración : ${res.result.duration}\n≡ Calidad : ${qual}\n≡ Vistas : ${views}`;
+            const dll = res.result.files.high || res.result.files.low;
+            await sock.sendMessage(from, { video: { url: dll }, caption: txt }, { quoted: m });
+        } catch (e) {
+            await sock.sendMessage(from, { text: `❌ Error: ${e.message}` }, { quoted: m });
+        }
+    } 
+    // CASO 2: Es una BÚSQUEDA (Lo que tú querías)
+    else {
+        try {
+            await sock.sendMessage(from, { react: { text: "🔎", key: m.key } });
+            const res = await search(encodeURIComponent(text));
+            if (!res.result?.length) return sock.sendMessage(from, { text: 'No encontré nada.' }, { quoted: m });
+
+            // Creamos la lista numerada
+            const list = res.result.slice(0, 10).map((v, i) => `*${i + 1}* ┃ ${v.title}`).join('\n');
+            
+            const caption = `*乂 ¡${BotName} - BUSQUEDA! 乂*\n\n${list}\n\n> 🔢 *Responde con el número del video que quieres descargar.*`;
+            
+            // Guardamos los resultados en la MEMORIA GLOBAL
+            global.xnxxSession[from] = {
+                result: res.result,
+                timeout: setTimeout(() => { delete global.xnxxSession[from] }, 120000) // Se borra en 2 minutos
+            };
+
+            await sock.sendMessage(from, { text: caption }, { quoted: m });
+        } catch (e) {
+            await sock.sendMessage(from, { text: `❌ Error buscando: ${e.message}` }, { quoted: m });
+        }
+    }
 }
 
 
 
-// .welcome2 on/off
-if (body === '.welcome2 on' || body === '.welcome2 off') {
-    if (!esOwner && !isAdmin) return sock.sendMessage(from, { text: '⛔ Solo admins.' }, { quoted: m });
-    welcome2DB.status[from] = body === '.welcome2 on';
-    guardarWelcome2();
-    await sock.sendMessage(from, { text: `✅ Bienvenidas ${body === '.welcome2 on' ? 'ACTIVADAS' : 'DESACTIVADAS'}` }, { quoted: m });
+
+// ==========================================
+// ☁️ COMANDO: SUBIR ACTUALIZACIÓN (CENTRALIZADO)
+// ==========================================
+if (body === '.subiractu') {
+    // Usamos la seguridad centralizada que definimos arriba
+    if (!esOwner) {
+        return sock.sendMessage(from, { text: `⛔ Solo el equipo de dueños de ${ownerData.botName} puede usar esto.` }, { quoted: m });
+    }
+
+    await sock.sendMessage(from, { text: '☁️ *Subiendo cambios a GitHub...* \n_Por favor espera._' }, { quoted: m });
+
+    // Ejecuta el proceso de subida
+    exec('git add . && git commit -m "Actualización vía Bot" && git push origin main', (error, stdout, stderr) => {
+        if (error) {
+            return sock.sendMessage(from, { text: '❌ *Error en la subida:*\n' + error.message }, { quoted: m });
+        }
+        
+        sock.sendMessage(from, { 
+            text: `✅ *¡CÓDIGO ACTUALIZADO!* ☁️\n\nLos cambios ya están en la nube.\n\nLos demás owners ya pueden usar:\n👉 *.actualizar*` 
+        }, { quoted: m });
+    });
 }
 
-// .setwel2 (7 cupos para Foto/Video)
-if (body === '.setwel2') {
-    if (!esOwner && !isAdmin) return;
-    if (welcome2DB.files.length >= 7) return sock.sendMessage(from, { text: '⚠️ Cupos llenos (7/7).' }, { quoted: m });
-    const quoted = m.message.extendedTextMessage?.contextInfo?.quotedMessage;
-    const mime = quoted ? Object.keys(quoted)[0] : null;
-    if (mime !== 'imageMessage' && mime !== 'videoMessage') return sock.sendMessage(from, { text: '📸 Responde a una foto o video.' }, { quoted: m });
 
-    const buffer = await downloadContentFromMessage(quoted[mime], mime === 'imageMessage' ? 'image' : 'video');
-    let buf = Buffer.from([]); for await (const chunk of buffer) buf = Buffer.concat([buf, chunk]);
-    const path = `./media_in_${Date.now()}.${mime === 'imageMessage' ? 'jpg' : 'mp4'}`;
-    fs.writeFileSync(path, buf);
-    welcome2DB.files.push({ path, type: mime === 'imageMessage' ? 'image' : 'video' });
-    guardarWelcome2();
-    await sock.sendMessage(from, { text: `✅ Guardado en Bienvenida #${welcome2DB.files.length}` }, { quoted: m });
+
+
+// ==========================================
+// 🔄 COMANDO: ACTUALIZAR (CENTRALIZADO)
+// ==========================================
+if (body === '.actualizar') {
+    // Validación centralizada con el sistema híbrido
+    if (!esOwner) return sock.sendMessage(from, { text: `⛔ Acceso denegado.` }, { quoted: m });
+
+    await sock.sendMessage(from, { text: '🔄 *Buscando actualizaciones...*' }, { quoted: m });
+
+    exec('git pull origin main', (error, stdout, stderr) => {
+        if (error) {
+            return sock.sendMessage(from, { text: '❌ *Error al actualizar:*\n' + error.message }, { quoted: m });
+        }
+
+        if (stdout.includes('Already up to date')) {
+            return sock.sendMessage(from, { text: `✅ *${ownerData.botName}* ya cuenta con la última versión.` }, { quoted: m });
+        }
+
+        sock.sendMessage(from, { text: `✅ *¡ACTUALIZACIÓN INSTALADA!*\n\n🔄 *Reiniciando ${ownerData.botName}...*` }, { quoted: m });
+
+        // Espera 2 segundos y reinicia
+        setTimeout(() => {
+            process.exit(0); 
+        }, 2000);
+    });
 }
-
-// .welaudi2 (4 cupos para Audio)
-if (body === '.welaudi2') {
-    if (!esOwner && !isAdmin) return;
-    if (welcome2DB.audios.length >= 4) return sock.sendMessage(from, { text: '⚠️ Cupos llenos (4/4).' }, { quoted: m });
-    const quoted = m.message.extendedTextMessage?.contextInfo?.quotedMessage;
-    if (!quoted || !quoted.videoMessage) return sock.sendMessage(from, { text: '🎥 Responde a un video.' }, { quoted: m });
-
-    const buffer = await downloadContentFromMessage(quoted.videoMessage, 'video');
-    let buf = Buffer.from([]); for await (const chunk of buffer) buf = Buffer.concat([buf, chunk]);
-    const path = `./audio_in_${Date.now()}.mp3`;
-    fs.writeFileSync(path, buf);
-    welcome2DB.audios.push(path);
-    guardarWelcome2();
-    await sock.sendMessage(from, { text: `🎵 Audio de bienvenida guardado #${welcome2DB.audios.length}` }, { quoted: m });
-}
-
-// .delwe2 y .delaudio2
-if (body.startsWith('.delwe2') || body.startsWith('.delaudio2')) {
-    if (!esOwner && !isAdmin) return;
-    const esAudio = body.startsWith('.delaudio2');
-    const index = parseInt(body.split(' ')[esAudio ? 1 : 1]) - 1;
-    const lista = esAudio ? welcome2DB.audios : welcome2DB.files;
-    if (isNaN(index) || !lista[index]) return sock.sendMessage(from, { text: '❌ Número inválido.' }, { quoted: m });
-    const borrar = esAudio ? lista[index] : lista[index].path;
-    if (fs.existsSync(borrar)) fs.unlinkSync(borrar);
-    lista.splice(index, 1);
-    guardarWelcome2();
-    await sock.sendMessage(from, { text: `🗑️ Eliminado de Bienvenidas.` }, { quoted: m });
-}
-
-            // ==========================================
-            // ☁️ COMANDO: SUBIR ACTUALIZACIÓN (SOLO OWNER)
-            // ==========================================
-            if (body === '.subiractu') {
-                // Verificación ultra resistente para evitar errores de 'undefined'
-                const senderId = m.sender || (m.key && m.key.participant) || (m.key && m.key.remoteJid);
-                const soyElCreador = (senderId && (senderId.includes("526633147534") || senderId.includes("191809682694179"))) || m.key.fromMe;
-                
-                if (!soyElCreador) {
-                    return sock.sendMessage(from, { text: `⛔ Solo el creador de ${BotName} puede subir actualizaciones a GitHub.` }, { quoted: m });
-                }
-
-                await sock.sendMessage(from, { text: '☁️ *Subiendo cambios a la nube...*\n_Sincronizando con GitHub, por favor espera..._' }, { quoted: m });
-
-                // Comando: Agrega todo, pone un mensaje de commit y sube a la rama principal (main)
-                exec('git add . && git commit -m "Actualizacion automatica via Bot" && git push origin main', (error, stdout, stderr) => {
-                    if (error) {
-                        // Si hay error de Git, te lo dirá por WhatsApp
-                        return sock.sendMessage(from, { text: '❌ *Error en la subida:*\n' + error.message }, { quoted: m });
-                    }
-                    
-                    // Si todo salió bien
-                    sock.sendMessage(from, { 
-                        text: `✅ *¡CÓDIGO DE ${BotName} ACTUALIZADO!* ☁️\n\nLos cambios ya están en GitHub.\n\nAhora los demás owners pueden usar:\n👉 *.actualizar*` 
-                    }, { quoted: m });
-                });
-            }
-
-
-
-            // ==========================================
-            // 🔄 COMANDO: ACTUALIZAR (PARA TUS AMIGOS OWNERS)
-            // ==========================================
-            if (body === '.actualizar') {
-                // Verifica si es Owner (Tú o tus amigos agregados con .owner)
-                if (!esOwner) return sock.sendMessage(from, { text: `⛔ Solo los dueños de ${BotName} pueden actualizarlo.` }, { quoted: m });
-
-                await sock.sendMessage(from, { text: '🔄 *Buscando actualizaciones en la nube...*' }, { quoted: m });
-
-                // Descarga los cambios de GitHub
-                exec('git pull origin main', (error, stdout, stderr) => {
-                    if (error) {
-                        return sock.sendMessage(from, { text: '❌ *Error al actualizar:*\n' + error.message }, { quoted: m });
-                    }
-
-                    // Si dice "Already up to date", es que no hay nada nuevo
-                    if (stdout.includes('Already up to date')) {
-                        return sock.sendMessage(from, { text: `✅ *${BotName} ya está actualizado.*\nNo hay cambios pendientes.` }, { quoted: m });
-                    }
-
-                    // Si descargó algo, avisa y reinicia
-                    sock.sendMessage(from, { text: `✅ *¡ACTUALIZACIÓN INSTALADA!*\n\n🔄 *Reiniciando a ${BotName} para aplicar cambios...*` }, { quoted: m });
-
-                    // Esperamos 2 segundos y apagamos el bot (el start.sh lo volverá a prender)
-                    setTimeout(() => {
-                        process.exit(0); 
-                    }, 2000);
-                });
-            }
 
 
 
@@ -642,17 +606,76 @@ if (body.startsWith('.delwe2') || body.startsWith('.delaudio2')) {
                 }
             }
 
+// ==========================================
+// 👑 COMANDO: CREADOR (CENTRALIZADO)
+// ==========================================
+if (body === '.creador') {
+    const nombreOwner = ownerData.nombre; // Usa tu nombre central
+    const numeroOwner = ownerData.numero; // Usa tu número central
+    const instagram = "https://www.instagram.com/_.110418._?igsh=YW41MG52M3l4OHNq";
+    
+    const vcard = 'BEGIN:VCARD\n' + 
+                  'VERSION:3.0\n' + 
+                  'FN:' + nombreOwner + '\n' + 
+                  'ORG:Creador del Bot;\n' + 
+                  'TEL;type=CELL;type=VOICE;waid=' + numeroOwner + ':+' + numeroOwner + '\n' + 
+                  'NOTE:Puedes seguir a mi creador en Instagram: ' + instagram + '\n' + 
+                  'URL:' + instagram + '\n' + 
+                  'END:VCARD';
 
-            // ==========================================
-            // 👑 COMANDO: CREADOR (CONTACTO)
-            // ==========================================
-            if (body === '.creador') {
-                const nombreOwner = "Criss"; 
-                const numeroOwner = "526633147534"; 
-                const instagram = "https://www.instagram.com/_.110418._?igsh=YW41MG52M3l4OHNq";
-                const vcard = 'BEGIN:VCARD\n' + 'VERSION:3.0\n' + 'FN:' + nombreOwner + '\n' + 'ORG:Creador del Bot;\n' + 'TEL;type=CELL;type=VOICE;waid=' + numeroOwner + ':+' + numeroOwner + '\n' + 'NOTE:Puedes seguir a mi creador en Instagram: ' + instagram + '\n' + 'URL:' + instagram + '\n' + 'END:VCARD'
-                await sock.sendMessage(from, { contacts: { displayName: nombreOwner, contacts: [{ vcard }] } }, { quoted: m });
-            }
+    await sock.sendMessage(from, { 
+        contacts: { displayName: nombreOwner, contacts: [{ vcard }] } 
+    }, { quoted: m });
+}
+
+
+
+
+// ==========================================
+// 🎨 COMANDO: STICKER (FIX DEFINITIVO)
+// ==========================================
+if (body === '.s' || body === '.sticker') {
+    const quoted = m.message.extendedTextMessage?.contextInfo?.quotedMessage;
+    const msg = quoted || m.message;
+    const mime = (msg.imageMessage || msg.videoMessage || msg.stickerMessage)?.mimetype || '';
+
+    if (/image|video|webp/.test(mime)) {
+        if (msg.videoMessage && msg.videoMessage.seconds > 15) return sock.sendMessage(from, { text: '⚠️ El video no puede durar más de 15 segundos.' });
+
+        await sock.sendMessage(from, { react: { text: '🕓', key: m.key } });
+
+        try {
+            const type = mime.split('/')[0];
+            const stream = await downloadContentFromMessage(msg[Object.keys(msg)[0]], type);
+            const buffer = await bufferToData(stream);
+
+            // ✅ SOLUCIÓN: Definir nombres de archivos ANTES de usarlos
+            const ext = type === 'image' ? 'jpg' : 'mp4';
+            const tempFile = `./temp_stick_${Date.now()}.${ext}`;
+            const tempOut = `./sticker_${Date.now()}.webp`;
+
+            // Ahora sí guardamos el archivo
+            fs.writeFileSync(tempFile, buffer);
+
+            let ffmpegCmd = `ffmpeg -i ${tempFile} -vcodec libwebp -filter:v "scale='min(320,iw)':min'(320,ih)':force_original_aspect_ratio=decrease,fps=15, pad=320:320:-1:-1:color=white@0.0, split [a][b]; [a] palettegen=reserve_transparent=on:transparency_color=ffffff [p]; [b][p] paletteuse" -f webp ${tempOut}`;
+            if (type !== 'image') ffmpegCmd = `ffmpeg -i ${tempFile} -vcodec libwebp -filter:v "scale='min(320,iw)':min'(320,ih)':force_original_aspect_ratio=decrease,fps=15, pad=320:320:-1:-1:color=white@0.0, split [a][b]; [a] palettegen=reserve_transparent=on:transparency_color=ffffff [p]; [b][p] paletteuse" -loop 0 -ss 00:00:00 -t 00:00:10 -preset default -an -vsync 0 -s 512:512 ${tempOut}`;
+
+            exec(ffmpegCmd, async (err) => {
+                if (err) return sock.sendMessage(from, { text: '❌ Error FFmpeg.' });
+                
+                await sock.sendMessage(from, { sticker: fs.readFileSync(tempOut) }, { quoted: m });
+                await sock.sendMessage(from, { react: { text: '✅', key: m.key } });
+
+                if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
+                if (fs.existsSync(tempOut)) fs.unlinkSync(tempOut);
+            });
+        } catch (e) {
+            await sock.sendMessage(from, { text: '❌ Error: ' + e.message });
+        }
+    }
+}
+
+
 
             // ==========================================
             // 🏓 COMANDO: PING (VELOCIDAD)
@@ -695,6 +718,99 @@ if (body.startsWith('.delwe2') || body.startsWith('.delaudio2')) {
                 }
             }
 
+            // ==========================================
+            // 💎 SISTEMA DE BIENVENIDAS Y DESPEDIDAS (FULL)
+            // ==========================================
+            const esCmdWelcome = body.startsWith('.welcome') || body.startsWith('.setwel') || 
+                                 body.startsWith('.welaudi') || body.startsWith('.delwe') || 
+                                 body.startsWith('.delaudio'); // Agregamos .delaudio aquí para que lo detecte
+
+            if (esCmdWelcome) {
+                // Solo calculamos Admin si el usuario intenta configurar algo
+                const groupMetadata = isGroup ? await sock.groupMetadata(from) : null;
+                const isAdmin = groupMetadata ? groupMetadata.participants.find(p => p.id === sender)?.admin : false;
+
+                // --- 1. ACTIVAR / DESACTIVAR ---
+                if (body === '.welcome on' || body === '.welcome off' || body === '.welcome2 on' || body === '.welcome2 off') {
+                    if (!esOwner && !isAdmin) return sock.sendMessage(from, { text: '⛔ Solo admins o mi owner.' }, { quoted: m });
+                    
+                    const esIn = body.includes('2'); // Si tiene "2" es Entrada, si no es Salida
+                    const db = esIn ? welcome2DB : welcomeDB;
+                    
+                    db.status[from] = body.includes('on');
+                    esIn ? guardarWelcome2() : guardarWelcome();
+                    await sock.sendMessage(from, { text: `✨ Sistema de ${esIn ? 'BIENVENIDAS' : 'DESPEDIDAS'} ${body.includes('on') ? 'ACTIVADO' : 'DESACTIVADO'} con éxito.` }, { quoted: m });
+                }
+
+                // --- 2. CONFIGURAR FOTO / VIDEO (.setwel) ---
+                if (body === '.setwel' || body === '.setwel2') {
+                    if (!esOwner && !isAdmin) return;
+                    const db = body === '.setwel' ? welcomeDB : welcome2DB;
+                    if (db.files.length >= 7) return sock.sendMessage(from, { text: '⚠️ Cupos llenos (7/7).' }, { quoted: m });
+                    
+                    const quoted = m.message.extendedTextMessage?.contextInfo?.quotedMessage;
+                    const mime = quoted ? Object.keys(quoted)[0] : null;
+                    if (mime !== 'imageMessage' && mime !== 'videoMessage') return sock.sendMessage(from, { text: '📸 Responde a una foto o video para establecerla.' }, { quoted: m });
+
+                    const buffer = await downloadContentFromMessage(quoted[mime], mime === 'imageMessage' ? 'image' : 'video');
+                    let buf = Buffer.from([]); for await (const chunk of buffer) buf = Buffer.concat([buf, chunk]);
+                    const path = `./media_${Date.now()}.${mime === 'imageMessage' ? 'jpg' : 'mp4'}`;
+                    fs.writeFileSync(path, buf);
+                    db.files.push({ path, type: mime === 'imageMessage' ? 'image' : 'video' });
+                    body === '.setwel' ? guardarWelcome() : guardarWelcome2();
+                    await sock.sendMessage(from, { text: `✅ Archivo guardado. Cupos usados: ${db.files.length}/7` }, { quoted: m });
+                }
+
+                // --- 3. CONFIGURAR AUDIO (.welaudi) ---
+                if (body === '.welaudi' || body === '.welaudi2') {
+                    if (!esOwner && !isAdmin) return;
+                    const db = body === '.welaudi' ? welcomeDB : welcome2DB;
+                    if (db.audios.length >= 4) return sock.sendMessage(from, { text: '⚠️ Cupos de audio llenos (4/4).' }, { quoted: m });
+                    
+                    const quoted = m.message.extendedTextMessage?.contextInfo?.quotedMessage;
+                    if (!quoted || !quoted.audioMessage) return sock.sendMessage(from, { text: '🎵 Por favor, responde a una NOTA DE VOZ o CANCIÓN.' }, { quoted: m });
+
+                    const buffer = await downloadContentFromMessage(quoted.audioMessage, 'audio');
+                    let buf = Buffer.from([]); for await (const chunk of buffer) buf = Buffer.concat([buf, chunk]);
+                    const path = `./audio_${Date.now()}.mp3`;
+                    fs.writeFileSync(path, buf);
+                    db.audios.push(path);
+                    body === '.welaudi' ? guardarWelcome() : guardarWelcome2();
+                    await sock.sendMessage(from, { text: `✅ Audio correcto guardado. Cupos: ${db.audios.length}/4` }, { quoted: m });
+                }
+
+                // --- 4. BORRAR (.delwe / .delaudio) ---
+                // Aquí está la lógica exacta que pediste:
+                if (body.startsWith('.delwe') || body.startsWith('.delaudio')) {
+                    if (!esOwner && !isAdmin) return;
+                    
+                    // ¿Qué vamos a borrar?
+                    const esAudio = body.includes('audio'); // Si escribiste .delaudio... es Audio
+                    const esIn = body.includes('2');        // Si escribiste ...2 (ej: .delaudio2) es Bienvenida
+                    
+                    // Seleccionamos la base de datos correcta
+                    const db = esIn ? welcome2DB : welcomeDB;
+                    
+                    // Obtenemos el número (ej: .delaudio 2 -> index 1)
+                    const index = parseInt(body.split(' ')[1]) - 1;
+                    const lista = esAudio ? db.audios : db.files;
+                    
+                    if (isNaN(index) || !lista[index]) return sock.sendMessage(from, { text: '❌ Número inválido. Escribe el número del archivo a borrar.' }, { quoted: m });
+                    
+                    // Borrado físico del archivo
+                    const borrar = esAudio ? lista[index] : lista[index].path;
+                    if (fs.existsSync(borrar)) fs.unlinkSync(borrar);
+                    
+                    // Borrado de la lista
+                    lista.splice(index, 1);
+                    
+                    esIn ? guardarWelcome2() : guardarWelcome();
+                    
+                    const tipo = esAudio ? "AUDIO" : "IMAGEN/VIDEO";
+                    const lugar = esIn ? "BIENVENIDAS" : "DESPEDIDAS";
+                    await sock.sendMessage(from, { text: `🗑️ ${tipo} eliminado de ${lugar} correctamente.` }, { quoted: m });
+                }
+            }
 
 
 
@@ -791,9 +907,7 @@ if (body.startsWith('.delwe2') || body.startsWith('.delaudio2')) {
 
                 try {
                     const stream = await downloadContentFromMessage(media.m, media.t);
-                    let buffer = Buffer.from([]);
-                    for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
-
+                    const buffer = await bufferToData(stream);
                     const ext = media.t === 'image' ? 'jpg' : 'mp4';
                     const inp = `./temp_hd_${Date.now()}.${ext}`;
                     const out = `./hd_${Date.now()}.${ext}`;
@@ -855,8 +969,7 @@ if (body.startsWith('.delwe2') || body.startsWith('.delaudio2')) {
                 try {
                     // Descargamos el video
                     const stream = await downloadContentFromMessage(quoted.videoMessage, 'video');
-                    let buffer = Buffer.from([]);
-                    for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+                    const buffer = await bufferToData(stream);
 
                     const tempIn = `./temp_vid_${Date.now()}.mp4`;
                     const tempOut = `./temp_aud_${Date.now()}.mp3`;
@@ -1006,81 +1119,98 @@ ${userName}
             
             if (!banco[usuarioKey]) banco[usuarioKey] = 0;
 
-            // ==========================================
-            // 💰 COMANDO: ADDCOIN (SISTEMA HÍBRIDO + LISTA)
-            // ==========================================
-            if (body.startsWith('.addcoin')) {
-                // [REGLA 1] EL TRADUCTOR DE MILLONES
-                // Convierte "1k" en "1000" y "1m" en "1000000" automáticamente
-                let cantidadTexto = body.slice(9).trim().split(' ')[0]; // Toma el número escrito
-                cantidadTexto = cantidadTexto.replace(/k/gi, '000').replace(/m/gi, '000000');
-                let cantidad = parseInt(cantidadTexto);
 
-                // [REGLA 2 Y 3] VERIFICACIÓN MAESTRA (Dueño + Lista)
-                const soyElJefe = m.sender === "526633147534@s.whatsapp.net" || 
-                                  m.sender === "191809682694179@lid" || 
-                                  m.key.fromMe || 
-                                  m.sender.includes("5216633147534");
-                                  
-                const esOwnerRegistrado = global.realOwners && global.realOwners.includes(m.sender);
+// ==========================================
+// 💰 COMANDO: ADDCOIN (CENTRALIZADO + TRADUCTOR)
+// ==========================================
+if (body.startsWith('.addcoin')) {
+    // 1. VERIFICACIÓN CENTRALIZADA
+    // Ya no usamos números fijos aquí, usamos la variable esOwner que definimos arriba
+    if (!esOwner) {
+        return sock.sendMessage(from, { text: "❌ Solo mi Real Owner puede usar este comando." }, { quoted: m });
+    }
 
-                if (!soyElJefe && !esOwnerRegistrado) {
-                    return sock.sendMessage(from, { text: "❌ Solo los Real Owners pueden añadir dinero." }, { quoted: m });
-                }
+    // 2. TRADUCTOR DE MILLONES (k=mil, m=millón)
+    // Esto aplica la regla que pediste para los comandos de dinero
+    let rawCantidad = body.slice(9).trim().split(' ')[0];
+    if (!rawCantidad) return sock.sendMessage(from, { text: "⚠️ Escribe la cantidad. Ejemplo: .addcoin 1k @user" }, { quoted: m });
+    
+    rawCantidad = rawCantidad.toLowerCase().replace(/k/g, '000').replace(/m/g, '000000');
+    let cantidad = parseInt(rawCantidad);
 
-                // LÓGICA DEL COMANDO
-                // 1. Buscamos a quién darle el dinero
-                let target = m.message?.extendedTextMessage?.contextInfo?.participant || 
-                             m.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
+    // 3. IDENTIFICAR AL USUARIO
+    let target = m.message?.extendedTextMessage?.contextInfo?.participant || 
+                 m.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
 
-                if (!target) return sock.sendMessage(from, { text: "⚠️ Etiqueta o responde a quien quieras dar monedas." }, { quoted: m });
-                if (isNaN(cantidad)) return sock.sendMessage(from, { text: "⚠️ Escribe la cantidad. Ejemplo: .addcoin 1k @usuario" }, { quoted: m });
+    if (!target || isNaN(cantidad)) {
+        return sock.sendMessage(from, { text: "⚠️ Debes mencionar a alguien o responder a su mensaje." }, { quoted: m });
+    }
 
-                // 2. Agregamos el dinero (Asegúrate de tener tu base de datos lista)
-                // Esto asume que usas global.db.data.users. Si usas otro sistema, cambia esta línea:
-                if (global.db && global.db.data && global.db.data.users[target]) {
-                    global.db.data.users[target].money = (global.db.data.users[target].money || 0) + cantidad;
-                    
-                    await sock.sendMessage(from, { react: { text: "💰", key: m.key } });
-                    await sock.sendMessage(from, { 
-                        text: `✅ Se han añadido *${cantidad.toLocaleString()}* monedas a @${target.split('@')[0]}`,
-                        mentions: [target]
-                    }, { quoted: m });
-                } else {
-                    await sock.sendMessage(from, { text: "❌ Error: La base de datos de usuarios no está lista." }, { quoted: m });
-                }
-            }
+    // 4. ACTUALIZAR BANCO
+    let targetKey = target.split('@')[0];
+    banco[targetKey] = (banco[targetKey] || 0) + cantidad;
+    fs.writeFileSync(rutaBanco, JSON.stringify(banco, null, 2));
+
+    await sock.sendMessage(from, { react: { text: "💰", key: m.key } });
+    await sock.sendMessage(from, { 
+        text: `✅ Se han añadido *${cantidad.toLocaleString()}* monedas a @${targetKey}`,
+        mentions: [target]
+    }, { quoted: m });
+}
 
 
+// ==========================================
+// 👮‍♂️ COMANDO: ADMINISTRACIÓN (OWNER CENTRALIZADO)
+// ==========================================
+if (body.startsWith('.kick') || body.startsWith('.grupo') || body.startsWith('.admin')) {
+    if (!isGroup) return;
 
-            // ==========================================
-            // 👮‍♂️ COMANDO: ADMINISTRACIÓN
-            // ==========================================
-            if (body.startsWith('.kick') || body.startsWith('.grupo') || body.startsWith('.admin')) {
-                if (!from.endsWith('@g.us')) return sock.sendMessage(from, { text: '❌ Solo grupos.' }, { quoted: m });
-                const groupMetadata = await sock.groupMetadata(from);
-                const participants = groupMetadata.participants;
-                const senderId = sender; 
-                const botId = sock.user.id.split(':')[0] + '@s.whatsapp.net';
-                const isAdmin = participants.find(p => p.id === senderId)?.admin;
-                const isBotAdmin = participants.find(p => p.id === botId)?.admin;
+    // 1. REFRESCAR DATOS (Soluciona el error de tus capturas 54553 y 54571)
+    // Forzamos al bot a leer los permisos reales del servidor en este instante
+    const groupMetadata = await sock.groupMetadata(from).catch(() => null);
+    if (!groupMetadata) return;
+    const participants = groupMetadata.participants;
+    
+    // 2. IDENTIFICACIÓN DEL BOT (Híbrida: Número + LID)
+    const botId = sock.user.id.includes(':') ? sock.user.id.split(':')[0] + '@s.whatsapp.net' : sock.user.id;
+    const botEsAdmin = participants.find(p => p.id === botId)?.admin;
 
-                if (!isAdmin) return sock.sendMessage(from, { text: '⛔ No eres admin.' }, { quoted: m });
-                if (!isBotAdmin) return sock.sendMessage(from, { text: '⛔ Bot no es admin.' }, { quoted: m });
+    // 3. VALIDACIÓN DE OWNER (Usando tus datos de ownerData)
+    // Ahora reconoce tu ID Técnico "@lid" confirmado en tu captura .mied
+    const usuarioEsAdmin = participants.find(p => p.id === sender)?.admin;
+    const soyElOwner = sender.includes(ownerData.numero) || sender.includes(ownerData.lid) || m.key.fromMe;
 
-                if (body.startsWith('.kick')) {
-                    let victim = m.message.extendedTextMessage?.contextInfo?.participant || m.message.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
-                    if (victim) await sock.groupParticipantsUpdate(from, [victim], 'remove');
-                }
-                if (body.startsWith('.grupo')) {
-                    if (body.includes('cerrar')) await sock.groupSettingUpdate(from, 'announcement');
-                    if (body.includes('abrir')) await sock.groupSettingUpdate(from, 'not_announcement');
-                }
-                if (body.startsWith('.admin')) {
-                    let victim = m.message.extendedTextMessage?.contextInfo?.participant || m.message.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
-                    if (victim) await sock.groupParticipantsUpdate(from, [victim], 'promote');
-                }
-            }
+    if (!soyElOwner && !usuarioEsAdmin) {
+        return sock.sendMessage(from, { text: `⛔ Solo ${ownerData.nombre} o los admins pueden usar esto.` }, { quoted: m });
+    }
+
+    // SI EL BOT NO DETECTA SU RANGO (Arreglo para captura 54571)
+    if (!botEsAdmin) {
+        return sock.sendMessage(from, { text: `⚠️ ¡Error! ${ownerData.botName} necesita ser Admin para ejecutar órdenes. Por favor, dame el rango y vuelve a intentarlo.` }, { quoted: m });
+    }
+
+    const target = m.message.extendedTextMessage?.contextInfo?.participant || m.message.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
+
+    // .kick (Sacar)
+    if (body.startsWith('.kick') && target) {
+        await sock.groupParticipantsUpdate(from, [target], 'remove');
+        await sock.sendMessage(from, { text: '✅ Usuario eliminado correctamente.' });
+    }
+
+    // .admin (Dar Admin)
+    if (body.startsWith('.admin') && target) {
+        await sock.groupParticipantsUpdate(from, [target], 'promote');
+        await sock.sendMessage(from, { text: '✅ Ahora es administrador.' });
+    }
+
+    // .grupo (Cerrar/Abrir)
+    if (body.startsWith('.grupo')) {
+        const setting = body.includes('cerrar') ? 'announcement' : 'not_announcement';
+        await sock.groupSettingUpdate(from, setting);
+        await sock.sendMessage(from, { text: body.includes('cerrar') ? '🔒 Grupo cerrado (Solo admins).' : '🔓 Grupo abierto (Todos).' });
+    }
+}
+
 
 
             // ==========================================
@@ -1203,35 +1333,150 @@ ${userName}
  } catch (e) { console.log("Error recuperado:", e); }
     });
 
+// --- FUNCIONES NECESARIAS (NO BORRAR) ---
+const fetch = require('node-fetch');
+const cheerio = require('cheerio');
+
+function parseInfo(infoStr = '') {
+    const lines = infoStr.split('\n').map(v => v.trim()).filter(Boolean);
+    let dur = '', qual = '', views = '';
+    if (lines.length > 0) {
+        // Lógica simple para extraer info
+        const parts = lines.join(' ').split('-');
+        qual = parts[0]?.trim();
+        views = parts[1]?.trim();
+    }
+    return { dur, qual, views };
+}
+
+async function xnxxdl(URL) {
+    return new Promise((resolve, reject) => {
+        fetch(URL).then(res => res.text()).then(res => {
+            const $ = cheerio.load(res, { xmlMode: false });
+            const title = $('meta[property="og:title"]').attr('content');
+            const duration = $('meta[property="og:duration"]').attr('content') + 's'; 
+            const info = $('span.metadata').text();
+            const videoScript = $('#video-player-bg > script:nth-child(6)').html();
+            const files = {
+                low: (videoScript.match('html5player.setVideoUrlLow\\(\'(.*?)\'\\);') || [])[1],
+                high: (videoScript.match('html5player.setVideoUrlHigh\\(\'(.*?)\'\\);') || [])[1]
+            };
+            resolve({ result: { title, duration, info: parseInfo(info), files } });
+        }).catch(err => reject(err));
+    });
+}
+
+async function search(query) {
+    return new Promise((resolve, reject) => {
+        const baseurl = 'https://www.xnxx.com';
+        fetch(`${baseurl}/search/${query}`).then(res => res.text()).then(res => {
+            const $ = cheerio.load(res, { xmlMode: false });
+            const results = [];
+            $('div.mozaique').find('div.thumb-under').each(function() {
+                const title = $(this).find('a').attr('title');
+                const link = baseurl + $(this).find('a').attr('href');
+                if (title && link) results.push({ title, link });
+            });
+            resolve({ result: results });
+        }).catch(err => reject(err));
+    });
+}
 
     // ==========================================
-    // 🚪 DETECTOR DE EVENTOS DE GRUPO (UNIFICADO)
+    // 🚪 DETECTOR DE EVENTOS PREMIUM (TODO EN UNO)
     // ==========================================
     sock.ev.on('group-participants.update', async (anu) => {
-        const { id, participants, action } = anu;
-        const isRemove = action === 'remove';
-        const db = isRemove ? welcomeDB : welcome2DB;
-
-if (true) {
-            const metadata = await sock.groupMetadata(id);
-            for (let num of participants) {
-                let fIdx = db.files.length > 0 ? Math.floor(Math.random() * db.files.length) : -1;
-                let aIdx = db.audios.length > 0 ? Math.floor(Math.random() * db.audios.length) : -1;
+        try {
+            const { id, participants, action } = anu;
+            const isRemove = action === 'remove';
+            const db = isRemove ? welcomeDB : welcome2DB;
+            
+            // Verificamos si está activado en este grupo
+            if (db.status[id]) {
+                const metadata = await sock.groupMetadata(id);
+                const descripcion = metadata.desc ? metadata.desc.toString().slice(0, 100) + "..." : "Sin descripción";
+                const fecha = new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                const hora = new Date().toLocaleTimeString('es-ES');
                 
-                let txt = isRemove ? `👋 ¡Adiós @${num.split('@')[0]}!\n🚪 Saliste de: *${metadata.subject}*\n👥 Quedamos: *${metadata.participants.length}*` : 
-                                    `🌟 ¡Bienvenido @${num.split('@')[0]}! 🌟\n🏰 Entraste a: *${metadata.subject}*\n👥 Somos: *${metadata.participants.length}*`;
+                for (let item of participants) {
+                    // 🛡️ ARREGLO ANTI-CRASH: Extrae el ID correctamente
+                    const num = typeof item === 'object' ? item.id : item;
 
-                if (fIdx !== -1) {
-                    const media = db.files[fIdx];
-                    await sock.sendMessage(id, { [media.type]: fs.readFileSync(media.path), caption: txt, mentions: [num] });
-                }
-                if (aIdx !== -1) {
-                    await sock.sendMessage(id, { audio: fs.readFileSync(db.audios[aIdx]), mimetype: 'audio/mp4', ptt: true });
+                    let fIdx = db.files.length > 0 ? Math.floor(Math.random() * db.files.length) : -1;
+                    let aIdx = db.audios.length > 0 ? Math.floor(Math.random() * db.audios.length) : -1;
+                    
+                    // --- 🎨 DISEÑO 20X MEJORADO ---
+                    let txt = "";
+                    if (isRemove) {
+                        // 💀 MENSAJE DE DESPEDIDA
+                        txt = `╭─「 🕊️ *UN ADIÓS* 🕊️ 」\n` +
+                              `│\n` +
+                              `│ 👤 *Usuario:* @${num.split('@')[0]}\n` +
+                              `│ 🚪 *Se fue de:* ${metadata.subject}\n` +
+                              `│ 📅 *Fecha:* ${fecha}\n` +
+                              `│ ⏰ *Hora:* ${hora}\n` +
+                              `│\n` +
+                              `│ 🥀 _Un soldado ha caído..._\n` +
+                              `│ 👥 *Ahora somos:* ${metadata.participants.length} sobrevivientes.\n` +
+                              `│\n` +
+                              `╰───────────────────`;
+                    } else {
+                        // 🌟 MENSAJE DE BIENVENIDA
+                        txt = `╭─「 ✨ *NUEVO MIEMBRO* ✨ 」\n` +
+                              `│\n` +
+                              `│ 👋 *Hola:* @${num.split('@')[0]}\n` +
+                              `│ 🏰 *Bienvenido a:* ${metadata.subject}\n` +
+                              `│\n` +
+                              `│ 📅 *Fecha:* ${fecha}\n` +
+                              `│ ⏰ *Hora:* ${hora}\n` +
+                              `│ 👥 *Miembro N°:* ${metadata.participants.length}\n` +
+                              `│\n` +
+                              `│ 📝 *Descripción del Grupo:*\n` +
+                              `│ _${descripcion}_\n` +
+                              `│\n` +
+                              `│ 🛡️ _Lee las reglas para evitar el ban._\n` +
+                              `│\n` +
+                              `╰───────────────────`;
+                    }
+
+                    // Enviar Foto/Video si existe
+                    if (fIdx !== -1) {
+                        const media = db.files[fIdx];
+                        await sock.sendMessage(id, { [media.type]: fs.readFileSync(media.path), caption: txt, mentions: [num] });
+                    } else {
+                        await sock.sendMessage(id, { text: txt, mentions: [num] });
+                    }
+
+                    // Enviar Audio si existe
+                    if (aIdx !== -1) {
+                        await sock.sendMessage(id, { audio: fs.readFileSync(db.audios[aIdx]), mimetype: 'audio/mp4', ptt: true });
+                    }
                 }
             }
+        } catch (e) {
+            console.log("Error en bienvenida/despedida:", e);
         }
-    }); // <- Aquí se cierra el detector de grupo
+    }); 
+
+
 
 } // <- Esta llave cierra la función "async function iniciarBot()"
 
 iniciarBot(); // <- Esta línea arranca todo el proceso
+
+
+
+
+
+
+// ==========================================
+// 🛠️ FUNCIÓN AUXILIAR (LIMPIEZA DE CÓDIGO)
+// ==========================================
+async function bufferToData(stream) {
+    let buffer = Buffer.from([]);
+    for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+    return buffer;
+}
+
+
+
