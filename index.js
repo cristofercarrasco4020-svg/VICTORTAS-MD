@@ -475,6 +475,69 @@ if (body.startsWith('.delwe2') || body.startsWith('.delaudio2')) {
     await sock.sendMessage(from, { text: `🗑️ Eliminado de Bienvenidas.` }, { quoted: m });
 }
 
+            // ==========================================
+            // ☁️ COMANDO: SUBIR ACTUALIZACIÓN (SOLO OWNER)
+            // ==========================================
+            if (body === '.subiractu') {
+                // Verificación ultra resistente para evitar errores de 'undefined'
+                const senderId = m.sender || (m.key && m.key.participant) || (m.key && m.key.remoteJid);
+                const soyElCreador = (senderId && (senderId.includes("526633147534") || senderId.includes("191809682694179"))) || m.key.fromMe;
+                
+                if (!soyElCreador) {
+                    return sock.sendMessage(from, { text: `⛔ Solo el creador de ${BotName} puede subir actualizaciones a GitHub.` }, { quoted: m });
+                }
+
+                await sock.sendMessage(from, { text: '☁️ *Subiendo cambios a la nube...*\n_Sincronizando con GitHub, por favor espera..._' }, { quoted: m });
+
+                // Comando: Agrega todo, pone un mensaje de commit y sube a la rama principal (main)
+                exec('git add . && git commit -m "Actualizacion automatica via Bot" && git push origin main', (error, stdout, stderr) => {
+                    if (error) {
+                        // Si hay error de Git, te lo dirá por WhatsApp
+                        return sock.sendMessage(from, { text: '❌ *Error en la subida:*\n' + error.message }, { quoted: m });
+                    }
+                    
+                    // Si todo salió bien
+                    sock.sendMessage(from, { 
+                        text: `✅ *¡CÓDIGO DE ${BotName} ACTUALIZADO!* ☁️\n\nLos cambios ya están en GitHub.\n\nAhora los demás owners pueden usar:\n👉 *.actualizar*` 
+                    }, { quoted: m });
+                });
+            }
+
+
+
+            // ==========================================
+            // 🔄 COMANDO: ACTUALIZAR (PARA TUS AMIGOS OWNERS)
+            // ==========================================
+            if (body === '.actualizar') {
+                // Verifica si es Owner (Tú o tus amigos agregados con .owner)
+                if (!esOwner) return sock.sendMessage(from, { text: `⛔ Solo los dueños de ${BotName} pueden actualizarlo.` }, { quoted: m });
+
+                await sock.sendMessage(from, { text: '🔄 *Buscando actualizaciones en la nube...*' }, { quoted: m });
+
+                // Descarga los cambios de GitHub
+                exec('git pull origin main', (error, stdout, stderr) => {
+                    if (error) {
+                        return sock.sendMessage(from, { text: '❌ *Error al actualizar:*\n' + error.message }, { quoted: m });
+                    }
+
+                    // Si dice "Already up to date", es que no hay nada nuevo
+                    if (stdout.includes('Already up to date')) {
+                        return sock.sendMessage(from, { text: `✅ *${BotName} ya está actualizado.*\nNo hay cambios pendientes.` }, { quoted: m });
+                    }
+
+                    // Si descargó algo, avisa y reinicia
+                    sock.sendMessage(from, { text: `✅ *¡ACTUALIZACIÓN INSTALADA!*\n\n🔄 *Reiniciando a ${BotName} para aplicar cambios...*` }, { quoted: m });
+
+                    // Esperamos 2 segundos y apagamos el bot (el start.sh lo volverá a prender)
+                    setTimeout(() => {
+                        process.exit(0); 
+                    }, 2000);
+                });
+            }
+
+
+
+
                 // ==========================================
                 // 🔐 VERIFICACIÓN (CREADOR + LISTA)
                 // ==========================================
