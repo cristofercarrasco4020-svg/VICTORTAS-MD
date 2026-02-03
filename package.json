@@ -13,6 +13,7 @@
   "dependencies": {
     "@distube/ytdl-core": "^4.16.12",
     "@whiskeysockets/baileys": "^7.0.0-rc.9",
+    "aptoide-scraper": "^1.0.1",
     "axios": "^1.13.4",
     "cheerio": "^1.2.0",
     "node-fetch": "^2.7.0",
