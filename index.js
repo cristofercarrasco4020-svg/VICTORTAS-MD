@@ -1372,7 +1372,7 @@ ${userName}
 // ==========================================
 // 👤 COMANDO: PERFIL PRO (SOLUCIÓN DEFINITIVA)
 // ==========================================
-    case 'perfil':
+   case 'perfil':
     await sock.sendMessage(from, { react: { text: "💳", key: m.key } });
 
      userKey = sender.split('@')[0];
@@ -1463,7 +1463,7 @@ ${userName}
         caption: txt, 
         mentions: [sender] 
     }, { quoted: m });
-break; 
+break;
 
 
 // ==========================================
