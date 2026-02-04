@@ -112,6 +112,21 @@ async function iniciarBot() {
             const horaConsola = new Date().toLocaleTimeString();
             const textoMensaje = body || "📷 [Archivo/Sticker]";
 
+
+// ==========================================
+// 💰 ECONOMÍA (PRIMERO CARGAMOS DATOS)
+// ==========================================
+const rutaBanco = './banco.json';
+const rutaTitulos = './titulos.json';
+const leerJSON = (file) => fs.existsSync(file) ? JSON.parse(fs.readFileSync(file)) : {};
+const guardarJSON = (file, data) => fs.writeFileSync(file, JSON.stringify(data, null, 2));
+
+let banco = leerJSON(rutaBanco);
+let titulos = leerJSON(rutaTitulos);
+let usuarioKey = sender.split('@')[0]; // ✅ AGREGA ESTA LÍNEA EXACTAMENTE AQUÍ
+
+
+
             // ==========================================
             // 🧠 CEREBRO: EXTRACCIÓN AUTOMÁTICA
             // ==========================================
@@ -119,12 +134,23 @@ async function iniciarBot() {
             const command = isCmd ? body.slice(prefix.length).trim().split(' ').shift().toLowerCase() : '';
             const args = body.trim().split(' ').slice(1);
             const text = args.join(' ');
-            const q = args.join(' '); // Alias corto para texto
+            
+            // --- ⚠️ ZONA DE VARIABLES GLOBALES (AGREGAR ESTO) ⚠️ ---
+            // Declaramos esto AQUÍ para no tener errores de "Identifier already declared"
+            let userKey = sender.split('@')[0]; // Ya sabemos quién es el usuario desde el principio
+            let saldo = banco[userKey] || 0;    // Ya sabemos su saldo inicial
+            let quoted = m.message.extendedTextMessage?.contextInfo?.quotedMessage;
+            let msg = quoted || m.message;
+            let mime = (msg.imageMessage || msg.videoMessage || msg.stickerMessage)?.mimetype || '';
+            let target = ""; // Variable vacía para usar en menciones
+            let amount = 0;  // Variable para dinero
+            // -----------------------------------------------------
 
-            // Solo imprimimos en consola si es un comando real
             if (isCmd) {
                 console.log(`🎮 CMD: ${command} | DE: ${pushName}`);
             }
+
+
 
 
             // ==========================================
@@ -236,18 +262,7 @@ if (global.xnxxSession[from] && !isNaN(body) && !body.startsWith('.')) {
             console.log(`╰═══════════════════════════════════════╯`);
 
 
-            // ==========================================
-            // 💰 ECONOMÍA (PRIMERO CARGAMOS DATOS)
-            // ==========================================
-            const rutaBanco = './banco.json';
-            const rutaTitulos = './titulos.json';
-            const leerJSON = (file) => fs.existsSync(file) ? JSON.parse(fs.readFileSync(file)) : {};
-            const guardarJSON = (file, data) => fs.writeFileSync(file, JSON.stringify(data, null, 2));
-            
-            let banco = leerJSON(rutaBanco);
-            let titulos = leerJSON(rutaTitulos);
-            let usuarioKey = sender.split('@')[0];
-            
+
 // ==========================================
 // 🎒 BASE DE DATOS DE INVENTARIO
 // ==========================================
@@ -302,7 +317,8 @@ const msToTime = (duration) => {
             // ==========================================
             // 📜 COMANDO: MENU (DISEÑO COMPACTO)
             // ==========================================
-switch (command) { case 'menu': case 'help': case 'hlp':
+              switch (command) {
+               case 'menu': case 'help': case 'hlp':
                 await sock.sendMessage(from, { react: { text: "📂", key: m.key } });
 
                 const horaActual = new Date().getHours();
@@ -385,7 +401,7 @@ switch (command) { case 'menu': case 'help': case 'hlp':
                 textoMenu += `📍 *${ownerData.botName}* | By ${ownerData.nombre}`;
 
                 await sock.sendMessage(from, { ...mensajeMenu, caption: textoMenu }, { quoted: m });
-          break;
+            break;
 
 
 
@@ -393,6 +409,7 @@ switch (command) { case 'menu': case 'help': case 'hlp':
             // ==========================================
             // 🕵️ COMANDO: MI ID (DETECTOR DE NUMERO)
             // ==========================================
+
                 case 'mied': case 'id': case 'mi id':
                 const idCompleto = sender; 
                 const numeroLimpio = sender.split('@')[0]; 
@@ -406,7 +423,7 @@ switch (command) { case 'menu': case 'help': case 'hlp':
             // ==========================================
             // 🖼️ COMANDO: SETMENU (Dueño + Admins)
             // ==========================================
-                 case 'setmenu': case 'imagenmenu':
+               case 'setmenu': case 'imagenmenu':
                 const groupMetadata = isGroup ? await sock.groupMetadata(from) : null;
                 const participants = isGroup ? groupMetadata.participants : [];
                 const isAdmin = participants.find(p => p.id === sender)?.admin;
@@ -498,10 +515,15 @@ switch (command) { case 'menu': case 'help': case 'hlp':
 
             await sock.sendMessage(from, { text: caption }, { quoted: m });
         } catch (e) {
-            await sock.sendMessage(from, { text: `❌ Error buscando: ${e.message}` }, { quoted: m });
+            await sock.sendMessage(from, { text: `❌ Error buscando: ${e.message}` }, { quoted: m }); break;
+            }
         }
-    } // 👈 1. ESTA LLAVE ES IMPORTANTE (Cierra el "else" de la búsqueda)
-    break; // 👈 2. EL BREAK QUE SEPARA LOS COMANDOS
+    break; // 👈 ¡SÚPER IMPORTANTE! ESTE BREAK CIERRA EL COMANDO
+
+
+
+
+
 
 
 
@@ -509,7 +531,7 @@ switch (command) { case 'menu': case 'help': case 'hlp':
 // ==========================================
 // ☁️ COMANDO: SUBIR ACTUALIZACIÓN (CENTRALIZADO)
 // ==========================================
-     case 'subiractu':
+ case 'subiractu':
     // Usamos la seguridad centralizada que definimos arriba
     if (!esOwner) {
         return sock.sendMessage(from, { text: `⛔ Solo el equipo de dueños de ${ownerData.botName} puede usar esto.` }, { quoted: m });
@@ -525,8 +547,9 @@ switch (command) { case 'menu': case 'help': case 'hlp':
         
         sock.sendMessage(from, { 
             text: `✅ *¡CÓDIGO ACTUALIZADO!* ☁️\n\nLos cambios ya están en la nube.\n\nLos demás owners ya pueden usar:\n👉 *.actualizar*` 
-        }, { quoted: m }); });
-     break;
+        }, { quoted: m });
+    });
+break;
 
 
 
@@ -555,7 +578,7 @@ switch (command) { case 'menu': case 'help': case 'hlp':
             process.exit(0); 
         }, 2000);
     });
-break; 
+break; }
 
 
 
@@ -569,6 +592,7 @@ break;
                                   sender.includes(ownerData.lid) || 
                                   m.key.fromMe;
 
+
                 // 2. Definimos quién es un AMIGO CON PODER (Lista)
                 const esOwnerRegistrado = global.realOwners && global.realOwners.includes(sender);
 
@@ -580,7 +604,7 @@ break;
             // ==========================================
             // 👑 COMANDO: AGREGAR REAL OWNER
             // ==========================================
-                 case 'owner':
+               switch (command) { case 'owner':
                 // 1. VERIFICACIÓN CENTRALIZADA (Sin errores)
                 // Usamos 'esOwner' que ya definimos arriba correctamente
                 if (!esOwner) {
@@ -597,17 +621,19 @@ break;
 
                 // 3. GUARDAR
                 global.realOwners = global.realOwners || [];
+                
                 if (!global.realOwners.includes(participante)) {
                     global.realOwners.push(participante);
                     await sock.sendMessage(from, { text: `✅ ¡Acceso Concedido!\n@${participante.split('@')[0]} ahora es *Real Owner*.`, mentions: [participante] }, { quoted: m });
                 } else {
-                    await sock.sendMessage(from, { text: "💡 Esa persona ya es Owner." }, { quoted: m });  };
-              break;  
+                    await sock.sendMessage(from, { text: "💡 Esa persona ya es Owner." }, { quoted: m });
+}              break;
+
 
             // ==========================================
             // 🗑️ COMANDO: ELIMINAR OWNER
             // ==========================================
-                 case 'delowner':
+                case 'delowner':
                 // 1. Verificación Estricta (Solo TÚ puedes borrar)
                 const soyYo = sender.includes(ownerData.numero) || sender.includes(ownerData.lid) || m.key.fromMe;
 
@@ -624,14 +650,15 @@ break;
                     global.realOwners = global.realOwners.filter(owner => owner !== target);
                     await sock.sendMessage(from, { text: `✅ @${target.split('@')[0]} eliminado de la lista.`, mentions: [target] }, { quoted: m });
                 } else {
-                    await sock.sendMessage(from, { text: "⚠️ No es Owner." }, { quoted: m });}
-              break;
+                    await sock.sendMessage(from, { text: "⚠️ No es Owner." }, { quoted: m });
+              break;  }
+            }
 
 
 // ==========================================
 // 👑 COMANDO: CREADOR (CENTRALIZADO)
 // ==========================================
-     case 'creador':
+   switch (command) { case 'creador':
     const nombreOwner = ownerData.nombre; // Usa tu nombre central
     const numeroOwner = ownerData.numero; // Usa tu número central
     const instagram = "https://www.instagram.com/_.110418._?igsh=YW41MG52M3l4OHNq";
@@ -648,7 +675,7 @@ break;
     await sock.sendMessage(from, { 
         contacts: { displayName: nombreOwner, contacts: [{ vcard }] } 
     }, { quoted: m });
-    break; // 👈 SIN LLAVES ANTES DEL BREAK
+break; }
 
 
 
@@ -656,8 +683,10 @@ break;
 // ==========================================
 // 🎨 COMANDO: STICKER (FIX DEFINITIVO)
 // ==========================================
-     case 's': case 'stiker':
+   switch (command) { case 's': case 'stiker':
+    const quoted = m.message.extendedTextMessage?.contextInfo?.quotedMessage;
     const msg = quoted || m.message;
+    const mime = (msg.imageMessage || msg.videoMessage || msg.stickerMessage)?.mimetype || '';
 
     if (/image|video|webp/.test(mime)) {
         if (msg.videoMessage && msg.videoMessage.seconds > 15) return sock.sendMessage(from, { text: '⚠️ El video no puede durar más de 15 segundos.' });
@@ -693,22 +722,22 @@ break;
             await sock.sendMessage(from, { text: '❌ Error: ' + e.message });
         }
     }
-break;  
+break;  }
 
 
 
             // ==========================================
             // 🏓 COMANDO: PING (VELOCIDAD)
             // ==========================================
-                case 'ping':
+              switch (command) { case 'ping':
                 const velocidad = new Date().getTime() - (m.messageTimestamp * 1000);
                await sock.sendMessage(from, { text: `¡Pong! 🏓\n⚡ Velocidad: ${velocidad}ms\n✅ Estado: Online` }, { quoted: m });
-           break; 
+           break; }
 
             // ==========================================
             // 🎵 COMANDO: TIKTOK DL
             // ==========================================
-                 case 'tt': case 'tiktok':
+               switch (command) { case 'tt': case 'tiktok':
                 const query = body.slice(4).trim();
                 if (!query) return sock.sendMessage(from, { text: '⚠️ Escribe qué buscar.\nEj: .tt edit polnito' }, { quoted: m });
                 await sock.sendMessage(from, { text: '🔍 *Buscando tus 4 videos...*' }, { quoted: m });
@@ -736,15 +765,109 @@ break;
                     console.log(e);
                     await sock.sendMessage(from, { text: '❌ Error al descargar.' }, { quoted: m });
                 }
-           break; 
+           break; }
 
+            // ==========================================
+            // 💎 SISTEMA DE BIENVENIDAS Y DESPEDIDAS (FULL)
+            // ==========================================
+            const esCmdWelcome = body.startsWith('.welcome') || body.startsWith('.setwel') || 
+                                 body.startsWith('.welaudi') || body.startsWith('.delwe') || 
+                                 body.startsWith('.delaudio'); // Agregamos .delaudio aquí para que lo detecte
+
+            if (esCmdWelcome) {
+                // Solo calculamos Admin si el usuario intenta configurar algo
+                const groupMetadata = isGroup ? await sock.groupMetadata(from) : null;
+                const isAdmin = groupMetadata ? groupMetadata.participants.find(p => p.id === sender)?.admin : false;
+
+                // --- 1. ACTIVAR / DESACTIVAR ---
+                if (body === '.welcome on' || body === '.welcome off' || body === '.welcome2 on' || body === '.welcome2 off') {
+                    if (!esOwner && !isAdmin) return sock.sendMessage(from, { text: '⛔ Solo admins o mi owner.' }, { quoted: m });
+                    
+                    const esIn = body.includes('2'); // Si tiene "2" es Entrada, si no es Salida
+                    const db = esIn ? welcome2DB : welcomeDB;
+                    
+                    db.status[from] = body.includes('on');
+                    esIn ? guardarWelcome2() : guardarWelcome();
+                    await sock.sendMessage(from, { text: `✨ Sistema de ${esIn ? 'BIENVENIDAS' : 'DESPEDIDAS'} ${body.includes('on') ? 'ACTIVADO' : 'DESACTIVADO'} con éxito.` }, { quoted: m });
+                }
+
+                // --- 2. CONFIGURAR FOTO / VIDEO (.setwel) ---
+                if (body === '.setwel' || body === '.setwel2') {
+                    if (!esOwner && !isAdmin) return;
+                    const db = body === '.setwel' ? welcomeDB : welcome2DB;
+                    if (db.files.length >= 7) return sock.sendMessage(from, { text: '⚠️ Cupos llenos (7/7).' }, { quoted: m });
+                    
+                    const quoted = m.message.extendedTextMessage?.contextInfo?.quotedMessage;
+                    const mime = quoted ? Object.keys(quoted)[0] : null;
+                    if (mime !== 'imageMessage' && mime !== 'videoMessage') return sock.sendMessage(from, { text: '📸 Responde a una foto o video para establecerla.' }, { quoted: m });
+
+                    const buffer = await downloadContentFromMessage(quoted[mime], mime === 'imageMessage' ? 'image' : 'video');
+                    let buf = Buffer.from([]); for await (const chunk of buffer) buf = Buffer.concat([buf, chunk]);
+                    const path = `./media_${Date.now()}.${mime === 'imageMessage' ? 'jpg' : 'mp4'}`;
+                    fs.writeFileSync(path, buf);
+                    db.files.push({ path, type: mime === 'imageMessage' ? 'image' : 'video' });
+                    body === '.setwel' ? guardarWelcome() : guardarWelcome2();
+                    await sock.sendMessage(from, { text: `✅ Archivo guardado. Cupos usados: ${db.files.length}/7` }, { quoted: m });
+                }
+
+                // --- 3. CONFIGURAR AUDIO (.welaudi) ---
+                if (body === '.welaudi' || body === '.welaudi2') {
+                    if (!esOwner && !isAdmin) return;
+                    const db = body === '.welaudi' ? welcomeDB : welcome2DB;
+                    if (db.audios.length >= 4) return sock.sendMessage(from, { text: '⚠️ Cupos de audio llenos (4/4).' }, { quoted: m });
+                    
+                    const quoted = m.message.extendedTextMessage?.contextInfo?.quotedMessage;
+                    if (!quoted || !quoted.audioMessage) return sock.sendMessage(from, { text: '🎵 Por favor, responde a una NOTA DE VOZ o CANCIÓN.' }, { quoted: m });
+
+                    const buffer = await downloadContentFromMessage(quoted.audioMessage, 'audio');
+                    let buf = Buffer.from([]); for await (const chunk of buffer) buf = Buffer.concat([buf, chunk]);
+                    const path = `./audio_${Date.now()}.mp3`;
+                    fs.writeFileSync(path, buf);
+                    db.audios.push(path);
+                    body === '.welaudi' ? guardarWelcome() : guardarWelcome2();
+                    await sock.sendMessage(from, { text: `✅ Audio correcto guardado. Cupos: ${db.audios.length}/4` }, { quoted: m });
+                }
+
+                // --- 4. BORRAR (.delwe / .delaudio) ---
+                // Aquí está la lógica exacta que pediste:
+                if (body.startsWith('.delwe') || body.startsWith('.delaudio')) {
+                    if (!esOwner && !isAdmin) return;
+                    
+                    // ¿Qué vamos a borrar?
+                    const esAudio = body.includes('audio'); // Si escribiste .delaudio... es Audio
+                    const esIn = body.includes('2');        // Si escribiste ...2 (ej: .delaudio2) es Bienvenida
+                    
+                    // Seleccionamos la base de datos correcta
+                    const db = esIn ? welcome2DB : welcomeDB;
+                    
+                    // Obtenemos el número (ej: .delaudio 2 -> index 1)
+                    const index = parseInt(body.split(' ')[1]) - 1;
+                    const lista = esAudio ? db.audios : db.files;
+                    
+                    if (isNaN(index) || !lista[index]) return sock.sendMessage(from, { text: '❌ Número inválido. Escribe el número del archivo a borrar.' }, { quoted: m });
+                    
+                    // Borrado físico del archivo
+                    const borrar = esAudio ? lista[index] : lista[index].path;
+                    if (fs.existsSync(borrar)) fs.unlinkSync(borrar);
+                    
+                    // Borrado de la lista
+                    lista.splice(index, 1);
+                    
+                    esIn ? guardarWelcome2() : guardarWelcome();
+                    
+                    const tipo = esAudio ? "AUDIO" : "IMAGEN/VIDEO";
+                    const lugar = esIn ? "BIENVENIDAS" : "DESPEDIDAS";
+                    await sock.sendMessage(from, { text: `🗑️ ${tipo} eliminado de ${lugar} correctamente.` }, { quoted: m });
+                }
+            }
 
 
 
 
             // ==========================================
             // ℹ️ COMANDO: INFORMACIÓN DEL SISTEMA
-              case 'info': case 'estado':
+            // ==========================================
+             switch (command) { case 'info': case 'estado':
                 const uptime = process.uptime();
                 const horas = Math.floor(uptime / 3600);
                 const minutos = Math.floor((uptime % 3600) / 60);
@@ -753,14 +876,14 @@ break;
                 const speed = new Date().getTime() - (m.messageTimestamp * 1000);
                 const textoInfo = `💻 *INFORMACIÓN DEL SISTEMA* 💻\n\n👑 *Creador:* Criss\n🤖 *Bot:* ${BotName}\n🚀 *Velocidad:* ${speed}ms\n⏳ *Tiempo Activo:* ${horas}h ${minutos}m ${segundos}s\n💾 *RAM Usada:* ${ram} MB\n📱 *Plataforma:* Termux (Android)\n📚 *Base:* Baileys (JavaScript)\n🛡️ *Versión:* 1.0.0`;
                 await sock.sendMessage(from, { text: textoInfo }, { quoted: m });
-     
-    break; 
+           break; }
 
             // ==========================================
             // 💿 COMANDO: PLAY (MÚSICA Y VIDEO)
             // ==========================================
-                 case 'play': case 'play2':
+               switch (command) { case 'play':
                 const isVideo = !body.startsWith('.play2');
+               const query = body.replace(isVideo ? '.play' : '.play2', '').trim();
                 if (!query) return sock.sendMessage(from, { text: '⚠️ Escribe el nombre.' }, { quoted: m });
                 await sock.sendMessage(from, { text: `🔍 *Buscando:* ${query}...` }, { quoted: m });
                 try {
@@ -788,13 +911,14 @@ break;
                 } catch (e) {
                     await sock.sendMessage(from, { text: '❌ Error al procesar.' }, { quoted: m });
                 }
-           break; 
+           break; }
 
 
 // ==========================================
 // 🧠 COMANDO: IA (SERVIDOR WIDIPE - ESTABLE)
 // ==========================================
-     case 'ia': case 'chatgpt':
+   switch (command) { case 'ia': case 'chatgpt':
+    const text = body.slice(body.indexOf(' ') + 1).trim();
     if (body.split(' ').length < 2) return sock.sendMessage(from, { text: `🤖 Dime, ¿qué necesitas?` }, { quoted: m });
 
     await sock.sendMessage(from, { react: { text: "🧠", key: m.key } });
@@ -817,7 +941,7 @@ break;
             await sock.sendMessage(from, { text: "❌ Error fatal en IA." }, { quoted: m });
         }
     }
-break; 
+break; }
 
 
 
@@ -826,7 +950,7 @@ break;
             // ==========================================
             // 💎 COMANDO: HD (REMASTERIZAR)
             // ==========================================
-                 case 'hd':
+               switch (command) { case 'hd':
                 const getMedia = (msg) => {
                     if (!msg) return null;
                     if (msg.imageMessage) return { m: msg.imageMessage, t: 'image' };
@@ -835,6 +959,7 @@ break;
                     return null;
                 };
 
+                let target = m.message;
                 let media = getMedia(target);
                 
                 if (!media && m.message.extendedTextMessage?.contextInfo?.quotedMessage) {
@@ -878,6 +1003,7 @@ break;
                 } catch (e) {
                     console.log(e);
                     sock.sendMessage(from, { text: '❌ Error al procesar.' }, { quoted: m });
+                }
           break;  }
 
 
@@ -885,7 +1011,8 @@ break;
 // ==========================================
 // 🔎 COMANDO: GOOGLE IMAGE SEARCH (.imagen)
 // ==========================================
-     case 'imagen':
+   switch (command) { case 'imagen':
+    const text = body.slice(body.indexOf(' ') + 1).trim();
     if (body.split(' ').length < 2) return sock.sendMessage(from, { text: '❀ Por favor, ingrese un texto para buscar.' }, { quoted: m });
 
     await sock.sendMessage(from, { react: { text: "🕒", key: m.key } });
@@ -939,6 +1066,7 @@ break;
         console.log(error);
         await sock.sendMessage(from, { text: `⚠︎ Ocurrió un error al buscar las imágenes.` }, { quoted: m });
         await sock.sendMessage(from, { react: { text: "✖️", key: m.key } });
+    }
 break; }
 
 
@@ -946,7 +1074,8 @@ break; }
             // ==========================================
             // 🎵 COMANDO: VIDEO A MP3 (.tomp3)
             // ==========================================
-                case 'for3':
+               switch (command) { case 'for3':
+                const quoted = m.message.extendedTextMessage?.contextInfo?.quotedMessage;
                 if (!quoted || !quoted.videoMessage) {
                     return sock.sendMessage(from, { text: '⚠️ Responde a un *video* con el comando *.tomp3* para convertirlo.' }, { quoted: m });
                 }
@@ -985,6 +1114,7 @@ break; }
                 } catch (e) {
                     console.log(e);
                     sock.sendMessage(from, { text: '❌ Ocurrió un fallo inesperado.' }, { quoted: m });
+                }
            break; }
 
 
@@ -994,7 +1124,7 @@ break; }
             // 🎮 ZONA: JUEGOS Y DIVERSIÓN
             // ==========================================
 
-      case 'gay':
+    switch (command) { case 'gay':
     let mencionado = m.message.extendedTextMessage?.contextInfo?.participant 
         || m.message.extendedTextMessage?.contextInfo?.mentionedJid?.[0] 
         || m.key.participant; // si no hay menciones, toma al autor
@@ -1017,15 +1147,15 @@ break; }
     await sock.sendMessage(from, { 
         text: `🏳️‍🌈 *Escáner Gay:*\n\n🧐 @${mencionado.split('@')[0]} es *${porcentaje}%* Gay.\n\n[${barra}] ${porcentaje}%\n\n${frase}`, 
         mentions: [mencionado] 
-    }); 
-    break; 
-
+    });
+break; }
 
             // ==========================================
             // 🔥 COMANDO: PENETRAR (NSFW)
             // ==========================================
-               case 'penetrar':
+              switch (command) { case 'penetrar':
                 // 1. Buscamos a quién mencionar (etiqueta o mensaje respondido)
+                let target = m.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0] || 
                              m.message?.extendedTextMessage?.contextInfo?.participant;
 
                 // Si no hay nadie, avisamos
@@ -1051,12 +1181,13 @@ ${userName}
                     text: responseMessage, 
                     mentions: [target] 
                 }, { quoted: m });
-   break; 
+           break; }
+
 
             // ==========================================
             // 🔞 COMANDO: TETAS (VERIFICADO Y SIN ERRORES)
             // ==========================================
-               case 'tetas': case 'tetitas':
+               switch (command) { case 'tetas': case 'tetitas':
                 // 1. Reacción inmediata para confirmar respuesta
                 await sock.sendMessage(from, { react: { text: "🔞", key: m.key } });
 
@@ -1084,17 +1215,18 @@ ${userName}
                         image: { url: backup.data.url }, 
                         caption: '*😋 TETAS*' 
                     }, { quoted: m });
+                }
           break;  }
 
 
-               case 'ppt':
+               switch (command) { case 'ppt':
                 const usuarioElige = body.slice(5).trim().toLowerCase();
                 const opciones = ["piedra", "papel", "tijera"];
                 if (!opciones.includes(usuarioElige)) return sock.sendMessage(from, { text: '⚠️ Elige: piedra, papel o tijera.' }, { quoted: m });
                 const botElige = opciones[Math.floor(Math.random() * opciones.length)];
                 let resultado = (usuarioElige === botElige) ? "🤝 ¡Empate!" : ((usuarioElige === "piedra" && botElige === "tijera") || (usuarioElige === "papel" && botElige === "piedra") || (usuarioElige === "tijera" && botElige === "papel")) ? "🏆 ¡Tú ganas!" : "😭 ¡Yo gano!";
                 await sock.sendMessage(from, { text: `🤖 Yo: *${botElige}*\n👤 Tú: *${usuarioElige}*\n\n${resultado}` }, { quoted: m });
-           break; 
+           break; }
 
             // ==========================================
             // 💰 SISTEMA: ECONOMÍA (BANCO)
@@ -1106,7 +1238,7 @@ ${userName}
             // ==========================================
             // 🛒 COMANDO: TIENDA (.shop)
             // ==========================================
-                case 'tienda': case 'shop':
+               switch (command) { case 'tienda': case 'shop':
                 await sock.sendMessage(from, { react: { text: "🛍️", key: m.key } });
 
                 let txt = `╭─── 〔 🏪 *MEGA MALL* 〕 ───\n`;
@@ -1128,12 +1260,12 @@ ${userName}
                 txt += `╰──────────────────────`;
 
                 await sock.sendMessage(from, { text: txt }, { quoted: m });
-           break; 
+           break; }
 
             // ==========================================
             // 💳 COMANDO: COMPRAR (.buy)
             // ==========================================
-                case 'buy': case 'comprar':
+               switch (command) { case 'buy': case 'comprar':
                 let itemID = body.split(' ')[1]?.toLowerCase();
                 let userKey = sender.split('@')[0];
 
@@ -1163,12 +1295,13 @@ ${userName}
                 guardarInventario();
 
                 await sock.sendMessage(from, { text: `✅ *COMPRA EXITOSA*\nHas comprado: ${item.nombre} ${item.emoji}\n💰 Nuevo saldo: $${banco[userKey].toLocaleString()}` }, { quoted: m });
-           break; 
+           break; }
 
             // ==========================================
             // 🎒 COMANDO: INVENTARIO (.inv)
             // ==========================================
-                case 'inv': case 'inventario':
+               switch (command) { case 'inv': case 'inventario':
+                let userKey = sender.split('@')[0];
                 let items = inventario[userKey] || [];
 
                 if (items.length === 0) return sock.sendMessage(from, { text: "🎒 Tu inventario está vacío. Ve a comprar con .shop" }, { quoted: m });
@@ -1177,7 +1310,7 @@ ${userName}
                 let conteo = {};
                 items.forEach(i => { conteo[i] = (conteo[i] || 0) + 1; });
 
-                 txt = `🎒 *INVENTARIO DE ${pushName}*\n\n`;
+                let txt = `🎒 *INVENTARIO DE ${pushName}*\n\n`;
                 for (let id in conteo) {
                     let item = shopItems[id];
                     txt += `▪️ ${item.emoji} *${item.nombre}* (x${conteo[id]})\n`;
@@ -1188,13 +1321,13 @@ ${userName}
                 txt += `\n💰 *Valor de Activos:* $${valorTotal.toLocaleString()}`;
 
                 await sock.sendMessage(from, { text: txt }, { quoted: m });
-           break; 
+           break; }
 
             // ==========================================
             // 🎰 COMANDO: TRAGAMONEDAS (.slot)
             // ==========================================
-                case 'slot': case 'casino':
-                 userKey = sender.split('@')[0];
+               switch (command) { case 'slot': case 'casino':
+                let userKey = sender.split('@')[0];
                 let args = body.split(' ');
                 let apuestaStr = args[1];
 
@@ -1214,7 +1347,7 @@ ${userName}
                 // Animación (Fake delay)
                 await sock.sendMessage(from, { react: { text: "🎰", key: m.key } });
 
-                 resultado = "";
+                let resultado = "";
                 let ganancia = 0;
                 let mensajeFinal = "";
 
@@ -1241,27 +1374,27 @@ ${userName}
 
                 guardarJSON(rutaBanco, banco);
 
-                txt = `🎰 *TRAGAMONEDAS* 🎰\n\n`;
+                let txt = `🎰 *TRAGAMONEDAS* 🎰\n\n`;
                 txt += `      │${a}│${b}│${c}│\n\n`;
                 txt += `${resultado}\n${mensajeFinal}\n🏦 Saldo: $${banco[userKey].toLocaleString()}`;
 
                 await sock.sendMessage(from, { text: txt }, { quoted: m });
-           break; 
+           break; }
 
             // ==========================================
             // 🔴 COMANDO: RULETA (.ruleta)
             // ==========================================
-                case 'ruleta': case 'rulette':
-                let  = body.split(' ');
+               switch (command) { case 'ruleta': case 'rulette':
+                let args = body.split(' ');
                 let color = args[1]?.toLowerCase(); // rojo, negro, verde
-                userKey = sender.split('@')[0];
+                let apuestaStr = args[2];
 
                 if (!color || !apuestaStr || !['rojo', 'negro', 'verde'].includes(color)) {
                     return sock.sendMessage(from, { text: `🔴 *RULETA EUROPEA*\nUso: .ruleta [color] [cantidad]\nColores: rojo, negro, verde\nEj: .ruleta negro 500` }, { quoted: m });
                 }
 
-                let  = sender.split('@')[0];
-                apuesta = apuestaStr === 'all' ? banco[userKey] : parseInt(apuestaStr.toLowerCase().replace(/k/g, '000').replace(/m/g, '000000'));
+                let userKey = sender.split('@')[0];
+                let apuesta = apuestaStr === 'all' ? banco[userKey] : parseInt(apuestaStr.toLowerCase().replace(/k/g, '000').replace(/m/g, '000000'));
 
                 if ((banco[userKey] || 0) < apuesta) return sock.sendMessage(from, { text: "💸 Fondos insuficientes." }, { quoted: m });
 
@@ -1271,7 +1404,7 @@ ${userName}
                 let random = Math.floor(Math.random() * 37); // 0-36
                 let resultadoColor = (random === 0) ? 'verde' : (random % 2 === 0) ? 'negro' : 'rojo';
                 
-                 ganancia = 0;
+                let ganancia = 0;
                 let win = false;
 
                 // Lógica de pagos
@@ -1286,20 +1419,20 @@ ${userName}
 
                 let emojiBola = resultadoColor === 'rojo' ? '🔴' : resultadoColor === 'negro' ? '⚫' : '🟢';
                 
-                 txt = `🎲 *LA BOLA GIRA...* 🎲\n\n`;
+                let txt = `🎲 *LA BOLA GIRA...* 🎲\n\n`;
                 txt += `Resultado: ${emojiBola} *[ ${random} ${resultadoColor.toUpperCase()} ]*\n`;
                 txt += win ? `🎉 *¡GANASTE!* Recibes: $${ganancia.toLocaleString()}` : `📉 *PERDISTE* todo...`;
                 txt += `\n🏦 Saldo: $${banco[userKey].toLocaleString()}`;
 
                 await sock.sendMessage(from, { text: txt }, { quoted: m });
-           break;
+           break; }
 
             // ==========================================
             // 🔫 COMANDO: ROBAR (.rob)
             // ==========================================
-                 case 'robar': case 'rob':
-                 userKey = sender.split('@')[0];
-                 target = m.message.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
+                switch (command) { case 'robar': case 'rob':
+                let userKey = sender.split('@')[0];
+                let target = m.message.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
                 
                 if (!target) return sock.sendMessage(from, { text: "🔫 Etiqueta a tu víctima." }, { quoted: m });
                 let targetKey = target.split('@')[0];
@@ -1333,13 +1466,13 @@ ${userName}
                 cooldowns[userKey] = { ...cooldowns[userKey], rob: now };
                 guardarJSON(rutaBanco, banco);
                 guardarCooldowns();
-           break; 
+           break; }
 
             // ==========================================
             // ⛏️ COMANDO: MINAR (.mine) - Requiere GPU
             // ==========================================
-                case 'mine': case 'minar':
-                userKey = sender.split('@')[0];
+               switch (command) { case 'mine': case 'minar':
+                let userKey = sender.split('@')[0];
                 let misItems = inventario[userKey] || [];
                 
                 // Buscar la mejor GPU que tenga el usuario
@@ -1351,8 +1484,8 @@ ${userName}
                 if (poderMinado === 0) return sock.sendMessage(from, { text: "⛏️ No tienes equipos de minería. Compra una GPU en la *.shop*" }, { quoted: m });
 
                 // Cooldown 1 hora
-                 time = cooldowns[userKey]?.mine || 0;
-                let  = Date.now();
+                let time = cooldowns[userKey]?.mine || 0;
+                let now = Date.now();
                 if (now - time < 60 * 60 * 1000) {
                     return sock.sendMessage(from, { text: `🔋 Recargando equipos. Vuelve en ${msToTime(60 * 60 * 1000 - (now - time))}.` }, { quoted: m });
                 }
@@ -1365,17 +1498,16 @@ ${userName}
                 guardarCooldowns();
 
                 await sock.sendMessage(from, { text: `🔌 *MINERÍA CRYPTO*\nTus máquinas generaron: 💰 $${poderMinado.toLocaleString()}` }, { quoted: m });
-           break; 
+           break;
 
 
 
 // ==========================================
 // 👤 COMANDO: PERFIL PRO (SOLUCIÓN DEFINITIVA)
 // ==========================================
-   case 'perfil':
+ case 'perfil':
     await sock.sendMessage(from, { react: { text: "💳", key: m.key } });
 
-     userKey = sender.split('@')[0];
      saldo = banco[userKey] || 0;
     
     // 1. DEFINICIÓN DE RANGOS (NIVELES)
@@ -1413,7 +1545,7 @@ ${userName}
     }
 
     // 3. BARRA DE PROGRESO
-     barra = "";
+    let barra = "";
     let falta = 0;
     if (nextRole) {
         let porcentaje = Math.floor((saldo / nextRole.limit) * 100);
@@ -1438,7 +1570,7 @@ ${userName}
     }
 
     // 5. DISEÑO DEL MENSAJE
-    txt = `╭─── 〔 💳 *TARJETA VIP* 〕 ───\n`;
+    let txt = `╭─── 〔 💳 *TARJETA VIP* 〕 ───\n`;
     txt += `│ 👤 *Usuario:* ${pushName}\n`;
     txt += `│ 🆔 *Tag:* @${userKey}\n`;
     txt += `│\n`;
@@ -1463,13 +1595,13 @@ ${userName}
         caption: txt, 
         mentions: [sender] 
     }, { quoted: m });
-break;
+break; }
 
 
 // ==========================================
 // ☢️ COMANDO: REINICIAR ECONOMÍA (RESET TOTAL)
 // ==========================================
-    case 'reseteco': case 'reseteconomia':
+   switch (command) { case 'reseteco': case 'reseteconomia':
     if (!esOwner) return sock.sendMessage(from, { text: '⛔ ¡ALTO! Solo el Creador puede reiniciar la economía.' }, { quoted: m });
 
     // 1. Vaciamos las variables en memoria
@@ -1485,19 +1617,19 @@ break;
     await sock.sendMessage(from, { 
         text: `☢️ *¡ECONOMÍA REINICIADA!* ☢️\n\nTodos los usuarios, dinero y tiempos han sido eliminados de la base de datos.\n\n🤖 *Sistema:* ${ownerData.botName}` 
     }, { quoted: m });
-break; 
+break; }
 
 
 
             // ==========================================
             // 🏆 COMANDO: BALTOP (RANKING MUNDIAL)
             // ==========================================
-                case 'baltop':
+               switch (command) { case 'baltop':
                 // Ordenamos la base de datos de mayor a menor
                 let sorted = Object.entries(banco).sort((a, b) => b[1] - a[1]);
                 let top = sorted.slice(0, 10); // Tomamos solo los 10 mejores
 
-                txt = `🏆 *TOP 10 MULTIMILLONARIOS* 🏆\n\n`;
+                let txt = `🏆 *TOP 10 MULTIMILLONARIOS* 🏆\n\n`;
                 
                 // Generamos la lista
                 top.forEach((user, index) => {
@@ -1510,16 +1642,16 @@ break;
                 // Mencionamos a los usuarios para que el link funcione
                 let mentions = top.map(u => u[0] + '@s.whatsapp.net');
                 await sock.sendMessage(from, { text: txt, mentions: mentions }, { quoted: m });
-           break;
+           break; }
 
             // ==========================================
             // 📅 COMANDO: DAILY (RECOMPENSA DIARIA)
             // ==========================================
-                case 'diario':
-                 userKey = sender.split('@')[0];
-                 time = cooldowns[userKey]?.daily || 0;
-                 now = Date.now();
-                 cooldown = 24 * 60 * 60 * 1000; // 24 Horas
+               switch (command) { case 'diario':
+                let userKey = sender.split('@')[0];
+                let time = cooldowns[userKey]?.daily || 0;
+                let now = Date.now();
+                let cooldown = 24 * 60 * 60 * 1000; // 24 Horas
 
                 if (now - time < cooldown) {
                     let restante = msToTime(cooldown - (now - time));
@@ -1537,16 +1669,16 @@ break;
                 guardarCooldowns();
 
                 await sock.sendMessage(from, { text: `🎁 *RECOMPENSA DIARIA*\nHas recibido: 💰 $${premio}` }, { quoted: m });
-           break;
+           break; }
 
             // ==========================================
             // ⛏️ COMANDO: WORK (TRABAJAR)
             // ==========================================
-                 case 'work': case 'trabajar':
-                 userKey = sender.split('@')[0];
-                 time = cooldowns[userKey]?.work || 0;
-                 now = Date.now();
-                 cooldown = 30 * 60 * 1000; // 30 Minutos
+                switch (command) { case 'work': case 'trabajar':
+                let userKey = sender.split('@')[0];
+                let time = cooldowns[userKey]?.work || 0;
+                let now = Date.now();
+                let cooldown = 30 * 60 * 1000; // 30 Minutos
 
                 if (now - time < cooldown) {
                     let restante = msToTime(cooldown - (now - time));
@@ -1571,15 +1703,15 @@ break;
                 guardarCooldowns();
 
                 await sock.sendMessage(from, { text: `🔨 ${trabajo}: 💰 $${sueldo}` }, { quoted: m });
-           break;
+           break; }
 
             // ==========================================
             // 💸 COMANDO: TRANSFER (TRANSFERENCIAS)
             // ==========================================
-                case 'pay': case 'transferir':
-                 args = body.split(' ');
-                 target = m.message.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
-                 amountStr = args.find(a => !a.includes('@') && a !== '.transfer' && a !== '.pay');
+               switch (command) { case 'pay': case 'transferir':
+                let args = body.split(' ');
+                let target = m.message.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
+                let amountStr = args.find(a => !a.includes('@') && a !== '.transfer' && a !== '.pay');
                 
                 if (!target || !amountStr) {
                     return sock.sendMessage(from, { text: `⚠️ Uso: .transfer [cantidad] [@usuario]\nEj: .transfer 100 @Juan` }, { quoted: m });
@@ -1588,7 +1720,7 @@ break;
                 // Traductor k/m
                 let amount = parseInt(amountStr.toLowerCase().replace(/k/g, '000').replace(/m/g, '000000'));
                 let senderKey = sender.split('@')[0];
-                 targetKey = target.split('@')[0];
+                let targetKey = target.split('@')[0];
 
                 if (isNaN(amount) || amount <= 0) return sock.sendMessage(from, { text: "⚠️ Cantidad inválida." }, { quoted: m });
                 if ((banco[senderKey] || 0) < amount) return sock.sendMessage(from, { text: "💸 No tienes suficiente dinero." }, { quoted: m });
@@ -1603,33 +1735,33 @@ break;
                     text: `✅ *TRANSFERENCIA EXITOSA*\n📤 De: @${senderKey}\n📥 Para: @${targetKey}\n💰 Monto: $${amount.toLocaleString()}`, 
                     mentions: [sender, target] 
                 }, { quoted: m });
-           break;
+           break; }
 
 
 // ==========================================
 // 💰 COMANDO: ADDCOIN (SISTEMA INTELIGENTE)
 // ==========================================
-    case 'addcoin': case 'dar':
+   switch (command) { case 'addcoin': case 'dar':
     if (!esOwner) return sock.sendMessage(from, { text: '⛔ Solo para mi Creador.' }, { quoted: m });
 
     // 1. Detectar Cantidad (Busca k/m en el texto)
-     args = body.split(' ');
-     amountStr = args.find(a => a.match(/^\d+(k|m)?$/i)); 
+    let args = body.split(' ');
+    let amountStr = args.find(a => a.match(/^\d+(k|m)?$/i)); 
     
     if (!amountStr) {
         return sock.sendMessage(from, { text: `⚠️ Escribe la cantidad.\nEj: .addcoin 10m (Para ti)\nEj: .addcoin 5k @usuario` }, { quoted: m });
     }
 
     // 2. Convertir cantidad (k=000, m=000000)
-     amount = parseInt(amountStr.toLowerCase().replace(/k/g, '000').replace(/m/g, '000000'));
+    let amount = parseInt(amountStr.toLowerCase().replace(/k/g, '000').replace(/m/g, '000000'));
 
     // 3. Detectar Objetivo (Mención > Respuesta > TÚ MISMO)
-     target = m.message.extendedTextMessage?.contextInfo?.mentionedJid?.[0] || 
+    let target = m.message.extendedTextMessage?.contextInfo?.mentionedJid?.[0] || 
                  m.message.extendedTextMessage?.contextInfo?.participant || 
                  sender; // <--- ESTO ES LO QUE TE FALTABA
 
     // 4. Obtener la ID numérica correcta
-     userKey = target.split('@')[0];
+    let userKey = target.split('@')[0];
 
     // 5. Ejecutar transacción
     banco[userKey] = (banco[userKey] || 0) + amount;
@@ -1639,7 +1771,7 @@ break;
         text: `✅ *TRANSACCIÓN EXITOSA*\n💰 *Añadido:* $${amount.toLocaleString()}\n👤 *Usuario:* @${userKey}\n💳 *Nuevo Saldo:* $${banco[userKey].toLocaleString()}`, 
         mentions: [target] 
     }, { quoted: m });
-break;
+break; }
 
 
 
@@ -1649,8 +1781,8 @@ break;
 // ==========================================
 // 📲 COMANDO: APK DOWNLOADER (API DIRECTA)
 // ==========================================
-    case 'apk': case 'mod apk':
-     text = body.split(' ').slice(1).join(' ').trim();
+   switch (command) { case 'apk': case 'mod apk':
+    const text = body.split(' ').slice(1).join(' ').trim();
     
     if (!text) {
         return sock.sendMessage(from, { text: `🍃 Ingresa el nombre. Ej: .apk WhatsApp` }, { quoted: m });
@@ -1661,7 +1793,7 @@ break;
     try {
         const { data } = await axios.get(`https://ws75.aptoide.com/api/7/apps/search?query=${text}&limit=1`);
 
-    if (!data || !data.datalist || !data.datalist.list || data.datalist.list.length === 0) {
+        if (!data || !data.datalist || !data.datalist.list || data.datalist.list.length === 0) {
             return sock.sendMessage(from, { text: `❌ No encontré resultados para "${text}".` }, { quoted: m });
         }
 
@@ -1693,15 +1825,15 @@ break;
         console.log(error);
         await sock.sendMessage(from, { text: `❌ Error en la API de Aptoide.` }, { quoted: m });
     }
-break; 
+break; }
 
 
 
             // ==========================================
             // 📌 COMANDO: PINTEREST (10 IMÁGENES - SIN ERROR)
             // ==========================================
-              case 'pin': case 'pinterest':
-                 text = body.slice(body.indexOf(' ') + 1).trim();
+             switch (command) { case 'pin': case 'pinterest':
+                const text = body.slice(body.indexOf(' ') + 1).trim();
                 if (body.split(' ').length < 2) return sock.sendMessage(from, { text: '❀ Dime qué buscar. Ej: .pin polnito' }, { quoted: m });
 
                 await sock.sendMessage(from, { react: { text: "🕒", key: m.key } });
@@ -1993,6 +2125,7 @@ async function googleImage(query) {
         return results.filter(url => !url.includes('gstatic') && !url.includes('google'));
     } catch (e) { return []; }
 }
+
 
 
 
