@@ -18,11 +18,36 @@ const ownerData = {
     numero: "526633147534",  // Tu número principal
     lid: "191809682694179",  // Tu ID técnico (LID)
     nombre: "Criss",         // Tu nombre
-    botName: "Crissbot"      // Nombre del Bot
+    botName: "VICTORTAS"      // Nombre del Bot
 };
 
 let botActivo = true; 
 
+// ==========================================
+// 🛒 CONFIGURACIÓN MAESTRA DE LA TIENDA
+// ==========================================
+const shopItems = {
+    // 🚗 VEHÍCULOS
+    'toyota':   { nombre: "Toyota Corolla", precio: 15000,   emoji: "🚗", tipo: 'coche' },
+    'ferrari':  { nombre: "Ferrari 488",    precio: 250000,  emoji: "🏎️", tipo: 'coche' },
+    'lambo':    { nombre: "Lamborghini",    precio: 500000,  emoji: "🚔", tipo: 'coche' },
+    'bugatti':  { nombre: "Bugatti Chiron", precio: 2000000, emoji: "🚀", tipo: 'coche' },
+
+    // 🏰 PROPIEDADES
+    'choza':    { nombre: "Choza de Tierra", precio: 5000,     emoji: "⛺", tipo: 'casa' },
+    'apto':     { nombre: "Apartamento",     precio: 50000,    emoji: "🏢", tipo: 'casa' },
+    'mansion':  { nombre: "Mansión Lujosa",  precio: 1500000,  emoji: "🏰", tipo: 'casa' },
+    'isla':     { nombre: "Isla Privada",    precio: 10000000, emoji: "🏝️", tipo: 'casa' },
+
+    // ⛏️ MINERÍA
+    'gpu':      { nombre: "Nvidia RTX 3090", precio: 20000,    emoji: "📼", tipo: 'mineria' },
+    'asic':     { nombre: "Antminer S19",    precio: 100000,   emoji: "🔌", tipo: 'mineria' },
+    'farm':     { nombre: "Granja de Minería", precio: 1000000, emoji: "🏭", tipo: 'mineria' },
+
+    // 💍 LUJO
+    'rolex':    { nombre: "Rolex de Oro",    precio: 30000,    emoji: "⌚", tipo: 'joya' },
+    'diamante': { nombre: "Diamante Puro",   precio: 100000,   emoji: "💎", tipo: 'joya' }
+};
 
 
 // ==========================================
@@ -88,8 +113,12 @@ async function iniciarBot() {
             if (shouldReconnect) iniciarBot();
         } else if (connection === 'open') {
             console.log('✅ ¡BOT CONECTADO Y LISTO! 🤖');
-        }
-    });
+            // Programamos la limpieza cada hora
+            setInterval(() => {
+                autoLimpiarSistema();
+            }, 3600000); 
+        } // <--- Esta llave cierra el "else if"
+    }); // <--- Esta llave con paréntesis cierra el "sock.ev.on"
 
     // ==========================================
     // 📩 MANEJADOR DE MENSAJES (EL NÚCLEO)
@@ -112,21 +141,6 @@ async function iniciarBot() {
             const horaConsola = new Date().toLocaleTimeString();
             const textoMensaje = body || "📷 [Archivo/Sticker]";
 
-
-// ==========================================
-// 💰 ECONOMÍA (PRIMERO CARGAMOS DATOS)
-// ==========================================
-const rutaBanco = './banco.json';
-const rutaTitulos = './titulos.json';
-const leerJSON = (file) => fs.existsSync(file) ? JSON.parse(fs.readFileSync(file)) : {};
-const guardarJSON = (file, data) => fs.writeFileSync(file, JSON.stringify(data, null, 2));
-
-let banco = leerJSON(rutaBanco);
-let titulos = leerJSON(rutaTitulos);
-let usuarioKey = sender.split('@')[0]; // ✅ AGREGA ESTA LÍNEA EXACTAMENTE AQUÍ
-
-
-
             // ==========================================
             // 🧠 CEREBRO: EXTRACCIÓN AUTOMÁTICA
             // ==========================================
@@ -134,21 +148,67 @@ let usuarioKey = sender.split('@')[0]; // ✅ AGREGA ESTA LÍNEA EXACTAMENTE AQU
             const command = isCmd ? body.slice(prefix.length).trim().split(' ').shift().toLowerCase() : '';
             const args = body.trim().split(' ').slice(1);
             const text = args.join(' ');
-            
-            // --- ⚠️ ZONA DE VARIABLES GLOBALES (AGREGAR ESTO) ⚠️ ---
-            // Declaramos esto AQUÍ para no tener errores de "Identifier already declared"
-            let userKey = sender.split('@')[0]; // Ya sabemos quién es el usuario desde el principio
-            let saldo = banco[userKey] || 0;    // Ya sabemos su saldo inicial
-            let quoted = m.message.extendedTextMessage?.contextInfo?.quotedMessage;
-            let msg = quoted || m.message;
-            let mime = (msg.imageMessage || msg.videoMessage || msg.stickerMessage)?.mimetype || '';
-            let target = ""; // Variable vacía para usar en menciones
-            let amount = 0;  // Variable para dinero
-            // -----------------------------------------------------
+            const q = args.join(' '); // Alias corto para texto
+            const isGroup = from.endsWith('@g.us');
 
+
+            // Solo imprimimos en consola si es un comando real
             if (isCmd) {
                 console.log(`🎮 CMD: ${command} | DE: ${pushName}`);
             }
+
+
+// ==========================================
+// 🏦 ECONOMÍA (SISTEMA DE PERSISTENCIA ÚNICA)
+// ==========================================
+const rutaBanco = './banco.json';
+
+// Esta función ahora solo se usa una vez al iniciar o para guardar
+const gestionarJSON = {
+    leer: (file) => {
+        if (!fs.existsSync(file)) return {};
+        try { return JSON.parse(fs.readFileSync(file, 'utf-8')); } catch { return {}; }
+    },
+    guardar: (file, data) => fs.writeFileSync(file, JSON.stringify(data, null, 2))
+};
+
+// 🚨 CARGA INICIAL: Solo ocurre una vez. Los comandos usarán la variable global.
+if (!global.banco_cargado) {
+    global.banco = gestionarJSON.leer(rutaBanco);
+    global.inventario = gestionarJSON.leer('./inventario.json');
+    global.titulos = gestionarJSON.leer('./titulos.json'); 
+    global.banco_cargado = true; 
+}
+
+
+
+// ==========================================
+// 🧠 CEREBRO: UNIFICADOR DE IDENTIDAD (ANTI-FANTASMA)
+// ==========================================
+let rawSender = m.key.participant || m.key.remoteJid;
+let userKey = rawSender.split('@')[0];
+
+// 🛡️ REGLA DE ORO: Si eres el dueño (en cualquier forma), eres el número 52...
+const esOwnerReal = rawSender.includes(ownerData.numero) || rawSender.includes(ownerData.lid) || m.key.fromMe;
+
+if (esOwnerReal || userKey === 'sdk' || userKey.length < 5) {
+    userKey = ownerData.numero; // Forzamos siempre a tu cuenta principal
+}
+
+// Ahora el saldo siempre lee de la cuenta correcta
+let saldo = global.banco[userKey] || 0;
+
+// Definimos el Target (Objetivo) para transferencias o regalos
+let targetRaw = m.message.extendedTextMessage?.contextInfo?.mentionedJid?.[0] || 
+                m.message.extendedTextMessage?.contextInfo?.participant || 
+                rawSender;
+
+let targetKey = targetRaw.split('@')[0];
+
+// Si le vas a dar dinero al dueño, redirigirlo al número 52...
+if (targetKey.includes(ownerData.numero) || targetKey.includes(ownerData.lid)) {
+    targetKey = ownerData.numero;
+}
 
 
 
@@ -246,7 +306,6 @@ if (global.xnxxSession[from] && !isNaN(body) && !body.startsWith('.')) {
 
 
 
-            const isGroup = from.endsWith('@g.us');
 
 
             // ==========================================
@@ -264,47 +323,8 @@ if (global.xnxxSession[from] && !isNaN(body) && !body.startsWith('.')) {
 
 
 // ==========================================
-// 🎒 BASE DE DATOS DE INVENTARIO
+// ⏱️ UTILIDAD: RELOJ (Para cooldowns futuros)
 // ==========================================
-const rutaInventario = './inventario.json';
-let inventario = fs.existsSync(rutaInventario) ? JSON.parse(fs.readFileSync(rutaInventario)) : {};
-const guardarInventario = () => fs.writeFileSync(rutaInventario, JSON.stringify(inventario, null, 2));
-
-// 🛒 CATÁLOGO DE LA TIENDA (CONFIGURACIÓN)
-const shopItems = {
-    // 🚗 VEHÍCULOS (Status)
-    'toyota':   { nombre: "Toyota Corolla", precio: 15000, emoji: "🚗", tipo: "coche" },
-    'ferrari':  { nombre: "Ferrari 488", precio: 250000, emoji: "🏎️", tipo: "coche" },
-    'lambo':    { nombre: "Lamborghini", precio: 500000, emoji: "🚔", tipo: "coche" },
-    'bugatti':  { nombre: "Bugatti Chiron", precio: 2000000, emoji: "🚀", tipo: "coche" },
-    
-    // 🏰 PROPIEDADES (Status)
-    'choza':    { nombre: "Choza de Tierra", precio: 5000, emoji: "⛺", tipo: "casa" },
-    'apto':     { nombre: "Apartamento", precio: 50000, emoji: "🏢", tipo: "casa" },
-    'mansion':  { nombre: "Mansión Lujosa", precio: 1500000, emoji: "🏰", tipo: "casa" },
-    'isla':     { nombre: "Isla Privada", precio: 10000000, emoji: "🏝️", tipo: "casa" },
-
-    // ⛏️ MINERÍA (Generan dinero con .mine)
-    'gpu':      { nombre: "Nvidia RTX 3090", precio: 20000, emoji: "📼", tipo: "mineria", rate: 500 },
-    'asic':     { nombre: "Antminer S19", precio: 100000, emoji: "🔌", tipo: "mineria", rate: 3000 },
-    'farm':     { nombre: "Granja de Minería", precio: 1000000, emoji: "🏭", tipo: "mineria", rate: 35000 },
-
-    // 💍 LUJO (Solo para presumir)
-    'rolex':    { nombre: "Rolex de Oro", precio: 30000, emoji: "⌚", tipo: "joya" },
-    'diamante': { nombre: "Diamante Puro", precio: 100000, emoji: "💎", tipo: "joya" }
-};
-
-
-            if (!banco[usuarioKey]) banco[usuarioKey] = 0;
-
-// ==========================================
-// ⏱️ BASE DE DATOS DE TIEMPOS (COOLDOWNS)
-// ==========================================
-const rutaCooldowns = './cooldowns.json';
-let cooldowns = fs.existsSync(rutaCooldowns) ? JSON.parse(fs.readFileSync(rutaCooldowns)) : {};
-const guardarCooldowns = () => fs.writeFileSync(rutaCooldowns, JSON.stringify(cooldowns, null, 2));
-
-// Función para formatear tiempo (ej: "2h 30m")
 const msToTime = (duration) => {
     let seconds = Math.floor((duration / 1000) % 60),
         minutes = Math.floor((duration / (1000 * 60)) % 60),
@@ -315,35 +335,47 @@ const msToTime = (duration) => {
 
 
             // ==========================================
-            // 📜 COMANDO: MENU (DISEÑO COMPACTO)
+            // 🎮 EL GRAN SWITCH (AQUÍ COMIENZAN LOS COMANDOS)
             // ==========================================
-              switch (command) {
-               case 'menu': case 'help': case 'hlp':
+            switch (command) {  // 👈 ¡AQUÍ SE ABRE EL SWITCH PRINCIPAL!
+
+
+            // ==========================================
+            // 📜 COMANDO: MENU (ACTUALIZADO Y SIN ERRORES)
+            // ==========================================
+            case 'menu': case 'help': case 'hlp':
                 await sock.sendMessage(from, { react: { text: "📂", key: m.key } });
 
                 const horaActual = new Date().getHours();
                 let saludo = horaActual >= 5 && horaActual < 12 ? "🌅 Buenos días" : 
                              horaActual >= 12 && horaActual < 19 ? "☀️ Buenas tardes" : "🌙 Buenas noches";
 
-                // Imagen o Video
+                // --- 🛠️ CORRECCIÓN DE DATOS (PARA QUE NO FALLE) ---
+                // Leemos directamente de la memoria global para asegurar datos frescos
+                const misTitulos = global.titulos || {};
+                const miSaldo = global.banco[userKey] || 0;
+                const miRango = misTitulos[userKey] || "Novato";
+
+                // Lógica de Imagen o Video
                 let mensajeMenu = {}; 
                 const defaultUrl = 'https://files.catbox.moe/tll9q5.mp4'; 
+                
                 if (fs.existsSync('./media_menu.mp4')) {
                     mensajeMenu = { video: fs.readFileSync('./media_menu.mp4'), gifPlayback: true };
                 } else if (fs.existsSync('./media_menu.jpg')) {
                     mensajeMenu = { image: fs.readFileSync('./media_menu.jpg') };
                 } else {
-                    mensajeMenu = { video: { url: defaultUrl }, gifPlayback: true }; 
+                    mensajeMenu = { video: { url: defaultUrl }, gifPlayback: false }; 
                 }
 
-                // --- CABECERA COMPACTA ---
+                // --- CABECERA ---
                 let textoMenu = `✨ *${saludo} ${pushName}* ✨\n`;
                 textoMenu += `👑 *Owner:* ${ownerData.nombre}\n`; 
                 textoMenu += `🤖 *Bot:* ${ownerData.botName}\n`;
-                textoMenu += `🎖️ *Rango:* ${titulos[usuarioKey] || "Novato"}\n`;
-                textoMenu += `💰 *Banco:* $${banco[usuarioKey].toLocaleString()}\n\n`;
+                textoMenu += `🎖️ *Rango:* ${miRango}\n`; 
+                textoMenu += `💰 *Banco:* $${miSaldo.toLocaleString()}\n\n`; 
 
-                // --- 💰 ECONOMÍA (Texto corto para no romper líneas) ---
+                // --- 💰 ECONOMÍA ---
                 textoMenu += `╭─〔 💰 ECONOMÍA 〕\n`;
                 textoMenu += `│💳 .perfil (Estado)\n`;
                 textoMenu += `│🎒 .inv (Mochila)\n`;
@@ -376,6 +408,8 @@ const msToTime = (duration) => {
                 textoMenu += `│🎨 .dibujar (Dall-E)\n`;
                 textoMenu += `│🔎 .imagen (Fotos)\n`;
                 textoMenu += `│💎 .hd (Calidad)\n`;
+                textoMenu += `│ℹ️ .info (Sistema)\n`;
+                textoMenu += `│⚡ .ping (Velocidad)\n`;
                 textoMenu += `│🕵️ .mied (Mi ID)\n`;
                 textoMenu += `╰──────────────\n\n`;
 
@@ -385,11 +419,12 @@ const msToTime = (duration) => {
                 textoMenu += `│✂️ .ppt (Jugar)\n`;
                 textoMenu += `│🔥 .penetrar (Rol)\n`;
                 textoMenu += `│🔞 .tetas (Pack)\n`;
+                textoMenu += `│🍑 .vagina (Pack)\n`;
                 textoMenu += `│🖼️ .s (Sticker)\n`;
                 textoMenu += `╰──────────────\n\n`;
 
                 // --- 👑 OWNER ---
-                textoMenu += `╭─〔 👑 OWNER 〕\n`;
+                textoMenu += `╭─〔 👑 ZONA OWNER 〕\n`;
                 textoMenu += `│🔹 .owner / .delowner\n`;
                 textoMenu += `│🔹 .bot on/off\n`;
                 textoMenu += `│🔹 .setname / .setmenu\n`;
@@ -401,774 +436,922 @@ const msToTime = (duration) => {
                 textoMenu += `📍 *${ownerData.botName}* | By ${ownerData.nombre}`;
 
                 await sock.sendMessage(from, { ...mensajeMenu, caption: textoMenu }, { quoted: m });
-            break;
-
+            break; 
 
 
 
             // ==========================================
             // 🕵️ COMANDO: MI ID (DETECTOR DE NUMERO)
             // ==========================================
+            case 'mied': case 'id': case 'mi id':
+                // Usamos las variables globales 'sender' y 'userKey' y 'txt'
+                txt = `🕵️ *DETECTOR DE IDENTIDAD*\n\n`;
+                txt += `📱 *Tu Número:* ${userKey}\n`;
+                txt += `🔑 *Tu ID Técnico:* ${sender}\n\n`;
+                txt += `⚠️ *NOTA:* Para que los comandos de Owner te reconozcan, asegúrate de que el config incluya: *"${userKey}"*`;
+                await sock.sendMessage(from, { text: txt }, { quoted: m });
+            break;
 
-                case 'mied': case 'id': case 'mi id':
-                const idCompleto = sender; 
-                const numeroLimpio = sender.split('@')[0]; 
-                let texto = `🕵️ *DETECTOR DE IDENTIDAD*\n\n`;
-                texto += `📱 *Tu Número:* ${numeroLimpio}\n`;
-                texto += `🔑 *Tu ID Técnico:* ${idCompleto}\n\n`;
-                texto += `⚠️ *NOTA:* Para que los comandos de Owner te reconozcan, asegúrate de que el código incluya: *"${numeroLimpio}"*`;
-                await sock.sendMessage(from, { text: texto }, { quoted: m });
-      break;
+
+
 
             // ==========================================
-            // 🖼️ COMANDO: SETMENU (Dueño + Admins)
+            // 🖼️ COMANDO: SETMENU (CORREGIDO)
             // ==========================================
-               case 'setmenu': case 'imagenmenu':
-                const groupMetadata = isGroup ? await sock.groupMetadata(from) : null;
-                const participants = isGroup ? groupMetadata.participants : [];
-                const isAdmin = participants.find(p => p.id === sender)?.admin;
-                
-                // VERIFICACIÓN: ¿Es el Dueño (Criss) o es un Admin del grupo?
-                const tienePermiso = sender.includes("191809682694179") || sender.includes("526633147534") || isAdmin;
+            case 'setmenu': case 'imagenmenu':
+                // 1. Verificación de seguridad
+                if (!esOwner) return sock.sendMessage(from, { text: '⛔ Solo mi Creador puede cambiar el menú.' }, { quoted: m });
 
-                if (!tienePermiso) {
-                     return sock.sendMessage(from, { text: '⛔ Solo el creador o los admins pueden usar esto.' }, { quoted: m });
+                // 2. 👇 AQUÍ ESTÁ EL ARREGLO: Definimos qué es el mensaje citado
+                let msgCitado = m.message.extendedTextMessage?.contextInfo?.quotedMessage;
+
+                // Si no respondió a nada...
+                if (!msgCitado) return sock.sendMessage(from, { text: '📸 *Error:* Debes responder a una FOTO o VIDEO para ponerlo en el menú.' }, { quoted: m });
+
+                // 3. Detectar si es imagen o video
+                let tipoArchivo = Object.keys(msgCitado)[0];
+                // Validamos que sea multimedia visual
+                if (!/imageMessage|videoMessage/.test(tipoArchivo)) {
+                    return sock.sendMessage(from, { text: '⚠️ Eso no es una imagen ni un video válido.' }, { quoted: m });
                 }
 
-                const quoted = m.message.extendedTextMessage?.contextInfo?.quotedMessage;
-                if (!quoted) return sock.sendMessage(from, { text: '📸 Responde a una foto o video.' }, { quoted: m });
-
-                const mime = Object.keys(quoted)[0];
-                if (mime !== 'imageMessage' && mime !== 'videoMessage') return sock.sendMessage(from, { text: '⚠️ Eso no es una imagen válida.' }, { quoted: m });
-
-                await sock.sendMessage(from, { text: '⏳ Actualizando portada del menú...' }, { quoted: m });
+                await sock.sendMessage(from, { text: '⏳ *Actualizando diseño del menú...*' }, { quoted: m });
 
                 try {
-                    const stream = await downloadContentFromMessage(quoted[mime], mime === 'imageMessage' ? 'image' : 'video');
+                    // 4. Descargar el archivo (Lógica universal)
+                    // Convertimos 'imageMessage' a 'image' o 'videoMessage' a 'video'
+                    let streamType = tipoArchivo.replace('Message', '');
+                    const stream = await downloadContentFromMessage(msgCitado[tipoArchivo], streamType);
                     let buffer = Buffer.from([]);
                     for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
 
+                    // 5. Limpieza previa (Borramos el menú anterior para no ocupar espacio)
                     if (fs.existsSync('./media_menu.jpg')) fs.unlinkSync('./media_menu.jpg');
                     if (fs.existsSync('./media_menu.mp4')) fs.unlinkSync('./media_menu.mp4');
 
-                    const rutaFinal = mime === 'imageMessage' ? './media_menu.jpg' : './media_menu.mp4';
-                    fs.writeFileSync(rutaFinal, buffer);
-                    await sock.sendMessage(from, { text: '✅ ¡Menú actualizado por un administrador!' }, { quoted: m });
-                } catch (e) { console.log(e); }
-           break; 
+                    // 6. Guardar el nuevo archivo
+                    if (tipoArchivo === 'imageMessage') {
+                        fs.writeFileSync('./media_menu.jpg', buffer);
+                    } else {
+                        fs.writeFileSync('./media_menu.mp4', buffer);
+                    }
+
+                    await sock.sendMessage(from, { text: '✅ *¡Cambio Exitoso!*\nEscribe *.menu* para ver tu nueva portada.' }, { quoted: m });
+
+                } catch (e) {
+                    console.log(e);
+                    await sock.sendMessage(from, { text: '❌ Error técnico al guardar la imagen.' }, { quoted: m });
+                }
+            break;
+
+
+
+            // ==========================================
+            // 🏷️ COMANDO: SETNAME (Solo Owner)
+            // ==========================================
+            case 'setname':
+                // Verificamos si es el dueño (variable global 'esOwner')
+                if (!esOwner) return;
+
+                // Usamos la variable global 'text' que ya contiene el argumento
+                if (!text) return sock.sendMessage(from, { text: '⚠️ Por favor, escribe el nuevo nombre del bot.' }, { quoted: m });
+                // Actualizamos el nombre en la memoria
+                ownerData.botName = text; 
+                await sock.sendMessage(from, { text: `✅ Nombre actualizado a: *${ownerData.botName}*` }, { quoted: m }); 
+            break;
 
 
 
 
 
             // ==========================================
-            // 🏷️ COMANDO: SETNAME (Dueño + Admins)
+            // 🔞 COMANDO: XNXX (BÚSQUEDA Y DESCARGA)
             // ==========================================
- case 'setname':
-    if (!esOwner) return;
-    const nuevoNombre = body.slice(9).trim();
-    if (!nuevoNombre) return;
-    
-    ownerData.botName = nuevoNombre; // Actualiza el cerebro del bot
-    await sock.sendMessage(from, { text: `✅ Nombre actualizado a: *${ownerData.botName}*` }, { quoted: m }); break;
+            case 'xnxx': case 'polnito':
+                // Usamos la variable global 'text'
+                if (!text) return sock.sendMessage(from, { text: '😈 Ingresa el nombre o link del video.' }, { quoted: m });
 
+                const isUrl = text.includes('xnxx.com');
 
-// ==========================================
-// 🔞 COMANDO: XNXX (BÚSQUEDA)
-// ==========================================
- case 'xnxx': case'polnito':
-    const text = body.slice(6).trim();
-    if (!text) return sock.sendMessage(from, { text: '❀ Ingresa el nombre o link del video.' }, { quoted: m });
+                // --- CASO 1: ES UN LINK DIRECTO ---
+                if (isUrl) {
+                    try {
+                        await sock.sendMessage(from, { react: { text: "⬇️", key: m.key } });
+                        
+                        const res = await xnxxdl(text);
+                        const { qual, views } = res.result.info;
+                        const txt = `*乂 ¡${ownerData.botName} - DOWNLOAD! 乂*\n\n≡ Título: ${res.result.title}\n≡ Duración: ${res.result.duration}\n≡ Calidad: ${qual}\n≡ Vistas: ${views}`;
+                        
+                        const dll = res.result.files.high || res.result.files.low;
+                        
+                        await sock.sendMessage(from, { video: { url: dll }, caption: txt }, { quoted: m });
+                        await sock.sendMessage(from, { react: { text: "✅", key: m.key } });
 
-    const isUrl = text.includes('xnxx.com');
-
-    // CASO 1: Es un LINK directo
-    if (isUrl) {
-        try {
-            await sock.sendMessage(from, { react: { text: "🕒", key: m.key } });
-            const res = await xnxxdl(text);
-            const { qual, views } = res.result.info;
-            const txt = `*乂 ¡${BotName} - DOWNLOAD! 乂*\n\n≡ Título : ${res.result.title}\n≡ Duración : ${res.result.duration}\n≡ Calidad : ${qual}\n≡ Vistas : ${views}`;
-            const dll = res.result.files.high || res.result.files.low;
-            await sock.sendMessage(from, { video: { url: dll }, caption: txt }, { quoted: m });
-        } catch (e) {
-            await sock.sendMessage(from, { text: `❌ Error: ${e.message}` }, { quoted: m });
-        }
-    } 
-    // CASO 2: Es una BÚSQUEDA (Lo que tú querías)
-    else {
-        try {
-            await sock.sendMessage(from, { react: { text: "🔎", key: m.key } });
-            const res = await search(encodeURIComponent(text));
-            if (!res.result?.length) return sock.sendMessage(from, { text: 'No encontré nada.' }, { quoted: m });
-
-            // Creamos la lista numerada
-            const list = res.result.slice(0, 10).map((v, i) => `*${i + 1}* ┃ ${v.title}`).join('\n');
-            
-            const caption = `*乂 ¡${BotName} - BUSQUEDA! 乂*\n\n${list}\n\n> 🔢 *Responde con el número del video que quieres descargar.*`;
-            
-            // Guardamos los resultados en la MEMORIA GLOBAL
-            global.xnxxSession[from] = {
-                result: res.result,
-                timeout: setTimeout(() => { delete global.xnxxSession[from] }, 120000) // Se borra en 2 minutos
-            };
-
-            await sock.sendMessage(from, { text: caption }, { quoted: m });
-        } catch (e) {
-            await sock.sendMessage(from, { text: `❌ Error buscando: ${e.message}` }, { quoted: m }); break;
-            }
-        }
-    break; // 👈 ¡SÚPER IMPORTANTE! ESTE BREAK CIERRA EL COMANDO
-
-
-
-
-
-
-
-
-
-// ==========================================
-// ☁️ COMANDO: SUBIR ACTUALIZACIÓN (CENTRALIZADO)
-// ==========================================
- case 'subiractu':
-    // Usamos la seguridad centralizada que definimos arriba
-    if (!esOwner) {
-        return sock.sendMessage(from, { text: `⛔ Solo el equipo de dueños de ${ownerData.botName} puede usar esto.` }, { quoted: m });
-    }
-
-    await sock.sendMessage(from, { text: '☁️ *Subiendo cambios a GitHub...* \n_Por favor espera._' }, { quoted: m });
-
-    // Ejecuta el proceso de subida
-    exec('git add . && git commit -m "Actualización vía Bot" && git push origin main', (error, stdout, stderr) => {
-        if (error) {
-            return sock.sendMessage(from, { text: '❌ *Error en la subida:*\n' + error.message }, { quoted: m });
-        }
-        
-        sock.sendMessage(from, { 
-            text: `✅ *¡CÓDIGO ACTUALIZADO!* ☁️\n\nLos cambios ya están en la nube.\n\nLos demás owners ya pueden usar:\n👉 *.actualizar*` 
-        }, { quoted: m });
-    });
-break;
-
-
-
-// ==========================================
-// 🔄 COMANDO: ACTUALIZAR (CENTRALIZADO)
-// ==========================================
- case 'actualizar':
-    // Validación centralizada con el sistema híbrido
-    if (!esOwner) return sock.sendMessage(from, { text: `⛔ Acceso denegado.` }, { quoted: m });
-
-    await sock.sendMessage(from, { text: '🔄 *Buscando actualizaciones...*' }, { quoted: m });
-
-    exec('git pull origin main', (error, stdout, stderr) => {
-        if (error) {
-            return sock.sendMessage(from, { text: '❌ *Error al actualizar:*\n' + error.message }, { quoted: m });
-        }
-
-        if (stdout.includes('Already up to date')) {
-            return sock.sendMessage(from, { text: `✅ *${ownerData.botName}* ya cuenta con la última versión.` }, { quoted: m });
-        }
-
-        sock.sendMessage(from, { text: `✅ *¡ACTUALIZACIÓN INSTALADA!*\n\n🔄 *Reiniciando ${ownerData.botName}...*` }, { quoted: m });
-
-        // Espera 2 segundos y reinicia
-        setTimeout(() => {
-            process.exit(0); 
-        }, 2000);
-    });
-break; }
-
-
-
-                // ==========================================
-                // 🔐 VERIFICACIÓN (CREADOR + LISTA)
-                // ==========================================
+                    } catch (e) {
+                        await sock.sendMessage(from, { text: `❌ Error al descargar: ${e.message}` }, { quoted: m });
+                    }
+                } 
                 
-                // CORRECCIÓN: Usamos 'sender' en vez de 'm.sender'
-                // Y usamos ownerData para que sea centralizado
-                const soyElJefe = sender.includes(ownerData.numero) || 
-                                  sender.includes(ownerData.lid) || 
-                                  m.key.fromMe;
+                // --- CASO 2: ES UNA BÚSQUEDA ---
+                else {
+                    try {
+                        await sock.sendMessage(from, { react: { text: "🔎", key: m.key } });
+                        
+                        // ⚠️ IMPORTANTE: Usamos 'searchXNXX' para no chocar con Aptoide
+                        const res = await searchXNXX(text); 
+                        
+                        if (!res.result?.length) return sock.sendMessage(from, { text: '❌ No encontré nada, puerco.' }, { quoted: m });
+
+                        // Creamos la lista numerada
+                        const list = res.result.slice(0, 10).map((v, i) => `*${i + 1}* ┃ ${v.title}`).join('\n');
+
+                        const caption = `*乂 ¡${ownerData.botName} - BÚSQUEDA! 乂*\n\n${list}\n\n> 🔢 *Responde con el número para descargar.*`;
+
+                        // Guardamos en memoria para el selector (esto es global automático)
+                        global.xnxxSession = global.xnxxSession || {};
+                        global.xnxxSession[from] = {
+                            result: res.result,
+                            timeout: setTimeout(() => { 
+                                if(global.xnxxSession[from]) delete global.xnxxSession[from];
+                            }, 120000) // 2 minutos
+                        };
+
+                        await sock.sendMessage(from, { text: caption }, { quoted: m });
+                    } catch (e) {
+                        console.log(e);
+                        await sock.sendMessage(from, { text: `❌ Error buscando.` }, { quoted: m });
+                    }
+                }
+            break;
 
 
-                // 2. Definimos quién es un AMIGO CON PODER (Lista)
-                const esOwnerRegistrado = global.realOwners && global.realOwners.includes(sender);
 
-                // 3. LA REGLA: Pasa si es Jefe O si es Registrado
-                // (Solo aplicable si usas comandos restringidos aquí abajo)
 
+            // ==========================================
+            // ☁️ COMANDO: SUBIR ACTUALIZACIÓN (OWNER)
+            // ==========================================
+            case 'subiractu':
+                // Usamos la seguridad global 'esOwner'
+                if (!esOwner) {
+                    return sock.sendMessage(from, { text: `⛔ Solo el equipo de dueños de ${ownerData.botName} puede usar esto.` }, { quoted: m });
+                }
+
+                await sock.sendMessage(from, { text: '☁️ *Subiendo cambios a GitHub...* \n_Por favor espera._' }, { quoted: m });
+
+                // Ejecuta el proceso de subida
+                exec('git add . && git commit -m "Actualización vía Bot" && git push origin main', (error, stdout, stderr) => {
+                    if (error) {
+                        return sock.sendMessage(from, { text: '❌ *Error en la subida:*\n' + error.message }, { quoted: m });
+                    }
+                    
+                    sock.sendMessage(from, { 
+                        text: `✅ *¡CÓDIGO ACTUALIZADO!* ☁️\n\nLos cambios ya están en la nube.\n\nLos demás owners ya pueden usar:\n👉 *.actualizar*` 
+                    }, { quoted: m });
+                });
+            break;
+
+
+
+
+            // ==========================================
+            // 🔄 COMANDO: ACTUALIZAR (OWNER)
+            // ==========================================
+            case 'actualizar':
+                // Validación usando la variable global 'esOwner'
+                if (!esOwner) return sock.sendMessage(from, { text: `⛔ Acceso denegado.` }, { quoted: m });
+
+                await sock.sendMessage(from, { text: '🔄 *Buscando actualizaciones...*' }, { quoted: m });
+
+                exec('git pull origin main', (error, stdout, stderr) => {
+                    if (error) {
+                        return sock.sendMessage(from, { text: '❌ *Error al actualizar:*\n' + error.message }, { quoted: m });
+                    }
+
+                    if (stdout.includes('Already up to date')) {
+                        return sock.sendMessage(from, { text: `✅ *${ownerData.botName}* ya cuenta con la última versión.` }, { quoted: m });
+                    }
+
+                    sock.sendMessage(from, { text: `✅ *¡ACTUALIZACIÓN INSTALADA!*\n\n🔄 *Reiniciando ${ownerData.botName}...*` }, { quoted: m });
+
+                    // Reinicio automático
+                    setTimeout(() => {
+                        process.exit(0); 
+                    }, 2000);
+                });
+            break;
 
 
             // ==========================================
             // 👑 COMANDO: AGREGAR REAL OWNER
             // ==========================================
-               switch (command) { case 'owner':
-                // 1. VERIFICACIÓN CENTRALIZADA (Sin errores)
-                // Usamos 'esOwner' que ya definimos arriba correctamente
+            case 'owner':
+                // 1. Verificación usando la variable global 'esOwner'
                 if (!esOwner) {
                     return sock.sendMessage(from, { text: `❌ Solo ${ownerData.nombre} puede usar esto.` }, { quoted: m });
                 }
 
-                // 2. OBTENER AL NUEVO OWNER
-                const participante = m.message?.extendedTextMessage?.contextInfo?.participant || 
-                                     m.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
+                // 2. Obtener al nuevo owner (etiquetado o respondido)
+                // Si definiste 'target' en las variables globales, podrías usar 'target', pero esto es más seguro:
+                const nuevoOwner = m.message?.extendedTextMessage?.contextInfo?.participant || 
+                                   m.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
 
-                if (!participante) {
-                    return sock.sendMessage(from, { text: "⚠️ Responde al mensaje de la persona que quieres hacer Owner." }, { quoted: m });
+                if (!nuevoOwner) {
+                    return sock.sendMessage(from, { text: "⚠️ Responde al mensaje o etiqueta a la persona." }, { quoted: m });
                 }
 
-                // 3. GUARDAR
+                // 3. Guardar en memoria global
                 global.realOwners = global.realOwners || [];
                 
-                if (!global.realOwners.includes(participante)) {
-                    global.realOwners.push(participante);
-                    await sock.sendMessage(from, { text: `✅ ¡Acceso Concedido!\n@${participante.split('@')[0]} ahora es *Real Owner*.`, mentions: [participante] }, { quoted: m });
+                if (!global.realOwners.includes(nuevoOwner)) {
+                    global.realOwners.push(nuevoOwner);
+                    await sock.sendMessage(from, { 
+                        text: `✅ *¡Acceso Concedido!*\n👤 @${nuevoOwner.split('@')[0]} ahora es *Real Owner*.`, 
+                        mentions: [nuevoOwner] 
+                    }, { quoted: m });
                 } else {
                     await sock.sendMessage(from, { text: "💡 Esa persona ya es Owner." }, { quoted: m });
-}              break;
+                }
+            break;
 
 
             // ==========================================
             // 🗑️ COMANDO: ELIMINAR OWNER
             // ==========================================
-                case 'delowner':
-                // 1. Verificación Estricta (Solo TÚ puedes borrar)
-                const soyYo = sender.includes(ownerData.numero) || sender.includes(ownerData.lid) || m.key.fromMe;
+            case 'delowner':
+                // 1. Verificación Estricta (Solo TÚ, el número principal, puedes borrar)
+                const soyElJefe = sender.includes(ownerData.numero) || sender.includes(ownerData.lid) || m.key.fromMe;
 
-                if (!soyYo) {
+                if (!soyElJefe) {
                     return sock.sendMessage(from, { text: "❌ Solo el Creador Principal puede eliminar owners." }, { quoted: m });
                 }
 
-                const target = m.message?.extendedTextMessage?.contextInfo?.participant || 
-                               m.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
+                // 2. Usamos la variable global 'target'
+                // Si target es igual a sender, significa que no etiquetó a nadie (se seleccionó a sí mismo por defecto)
+                if (target === sender) {
+                    return sock.sendMessage(from, { text: "⚠️ Responde al mensaje del Owner a eliminar." }, { quoted: m });
+                }
 
-                if (!target) return sock.sendMessage(from, { text: "⚠️ Responde al mensaje del Owner a eliminar." }, { quoted: m });
-
+                // 3. Ejecutar la eliminación
                 if (global.realOwners && global.realOwners.includes(target)) {
                     global.realOwners = global.realOwners.filter(owner => owner !== target);
-                    await sock.sendMessage(from, { text: `✅ @${target.split('@')[0]} eliminado de la lista.`, mentions: [target] }, { quoted: m });
+                    await sock.sendMessage(from, { 
+                        text: `✅ @${target.split('@')[0]} eliminado de la lista de Owners.`, 
+                        mentions: [target] 
+                    }, { quoted: m });
                 } else {
-                    await sock.sendMessage(from, { text: "⚠️ No es Owner." }, { quoted: m });
-              break;  }
-            }
-
-
-// ==========================================
-// 👑 COMANDO: CREADOR (CENTRALIZADO)
-// ==========================================
-   switch (command) { case 'creador':
-    const nombreOwner = ownerData.nombre; // Usa tu nombre central
-    const numeroOwner = ownerData.numero; // Usa tu número central
-    const instagram = "https://www.instagram.com/_.110418._?igsh=YW41MG52M3l4OHNq";
-    
-    const vcard = 'BEGIN:VCARD\n' + 
-                  'VERSION:3.0\n' + 
-                  'FN:' + nombreOwner + '\n' + 
-                  'ORG:Creador del Bot;\n' + 
-                  'TEL;type=CELL;type=VOICE;waid=' + numeroOwner + ':+' + numeroOwner + '\n' + 
-                  'NOTE:Puedes seguir a mi creador en Instagram: ' + instagram + '\n' + 
-                  'URL:' + instagram + '\n' + 
-                  'END:VCARD';
-
-    await sock.sendMessage(from, { 
-        contacts: { displayName: nombreOwner, contacts: [{ vcard }] } 
-    }, { quoted: m });
-break; }
+                    await sock.sendMessage(from, { text: "⚠️ Esa persona no es Owner." }, { quoted: m });
+                }
+            break;
 
 
 
 
-// ==========================================
-// 🎨 COMANDO: STICKER (FIX DEFINITIVO)
-// ==========================================
-   switch (command) { case 's': case 'stiker':
-    const quoted = m.message.extendedTextMessage?.contextInfo?.quotedMessage;
-    const msg = quoted || m.message;
-    const mime = (msg.imageMessage || msg.videoMessage || msg.stickerMessage)?.mimetype || '';
+            // ==========================================
+            // 👑 COMANDO: CREADOR (MEJORADO)
+            // ==========================================
+            case 'creador': case 'owner':
+                // 1. Reacción para confirmar
+                await sock.sendMessage(from, { react: { text: "👑", key: m.key } });
 
-    if (/image|video|webp/.test(mime)) {
-        if (msg.videoMessage && msg.videoMessage.seconds > 15) return sock.sendMessage(from, { text: '⚠️ El video no puede durar más de 15 segundos.' });
-
-        await sock.sendMessage(from, { react: { text: '🕓', key: m.key } });
-
-        try {
-            const type = mime.split('/')[0];
-            const stream = await downloadContentFromMessage(msg[Object.keys(msg)[0]], type);
-            const buffer = await bufferToData(stream);
-
-            // ✅ SOLUCIÓN: Definir nombres de archivos ANTES de usarlos
-            const ext = type === 'image' ? 'jpg' : 'mp4';
-            const tempFile = `./temp_stick_${Date.now()}.${ext}`;
-            const tempOut = `./sticker_${Date.now()}.webp`;
-
-            // Ahora sí guardamos el archivo
-            fs.writeFileSync(tempFile, buffer);
-
-            let ffmpegCmd = `ffmpeg -i ${tempFile} -vcodec libwebp -filter:v "scale='min(320,iw)':min'(320,ih)':force_original_aspect_ratio=decrease,fps=15, pad=320:320:-1:-1:color=white@0.0, split [a][b]; [a] palettegen=reserve_transparent=on:transparency_color=ffffff [p]; [b][p] paletteuse" -f webp ${tempOut}`;
-            if (type !== 'image') ffmpegCmd = `ffmpeg -i ${tempFile} -vcodec libwebp -filter:v "scale='min(320,iw)':min'(320,ih)':force_original_aspect_ratio=decrease,fps=15, pad=320:320:-1:-1:color=white@0.0, split [a][b]; [a] palettegen=reserve_transparent=on:transparency_color=ffffff [p]; [b][p] paletteuse" -loop 0 -ss 00:00:00 -t 00:00:10 -preset default -an -vsync 0 -s 512:512 ${tempOut}`;
-
-            exec(ffmpegCmd, async (err) => {
-                if (err) return sock.sendMessage(from, { text: '❌ Error FFmpeg.' });
+                const nombreOwner = ownerData.nombre; 
+                const numeroOwner = ownerData.numero; 
+                const instagram = "https://www.instagram.com/_.110418._?igsh=YW41MG52M3l4OHNq";
                 
-                await sock.sendMessage(from, { sticker: fs.readFileSync(tempOut) }, { quoted: m });
-                await sock.sendMessage(from, { react: { text: '✅', key: m.key } });
+                // 2. VCard Mejorada (Truco para que salga el botón de Instagram)
+                const vcard = 'BEGIN:VCARD\n' + 
+                              'VERSION:3.0\n' + 
+                              'FN:' + nombreOwner + '\n' + 
+                              'ORG:Creador de ' + ownerData.botName + ';\n' + 
+                              'TEL;type=CELL;type=VOICE;waid=' + numeroOwner + ':+' + numeroOwner + '\n' + 
+                              'item1.URL:' + instagram + '\n' + 
+                              'item1.X-ABLabel:Instagram\n' + 
+                              'END:VCARD';
 
-                if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
-                if (fs.existsSync(tempOut)) fs.unlinkSync(tempOut);
-            });
-        } catch (e) {
-            await sock.sendMessage(from, { text: '❌ Error: ' + e.message });
-        }
-    }
-break;  }
+                // 3. Enviamos el Contacto
+                await sock.sendMessage(from, { 
+                    contacts: { displayName: nombreOwner, contacts: [{ vcard }] } 
+                }, { quoted: m });
+
+                // 4. Enviamos el Mensaje de Texto (Para asegurar que se vea el link)
+                await sock.sendMessage(from, { 
+                    text: `🌟 *CONTACTO OFICIAL*\n\nHola, él es mi creador *${nombreOwner}*.\n\n📸 *Síguelo en Instagram:*\n${instagram}\n\n_Escríbele solo para temas importantes._` 
+                }, { quoted: m });
+            break; 
+
 
 
 
             // ==========================================
-            // 🏓 COMANDO: PING (VELOCIDAD)
+            // 🎨 COMANDO: STICKER (CORREGIDO Y LIMPIO)
             // ==========================================
-              switch (command) { case 'ping':
-                const velocidad = new Date().getTime() - (m.messageTimestamp * 1000);
-               await sock.sendMessage(from, { text: `¡Pong! 🏓\n⚡ Velocidad: ${velocidad}ms\n✅ Estado: Online` }, { quoted: m });
-           break; }
+            case 's': case 'sticker': case 'stiker':
+                // Usamos las variables globales (msg, mime) que ya definimos arriba
+                if (!mime) return sock.sendMessage(from, { text: '⚠️ Responde a una imagen o video.' }, { quoted: m });
 
-            // ==========================================
-            // 🎵 COMANDO: TIKTOK DL
-            // ==========================================
-               switch (command) { case 'tt': case 'tiktok':
-                const query = body.slice(4).trim();
-                if (!query) return sock.sendMessage(from, { text: '⚠️ Escribe qué buscar.\nEj: .tt edit polnito' }, { quoted: m });
-                await sock.sendMessage(from, { text: '🔍 *Buscando tus 4 videos...*' }, { quoted: m });
-                try {
-                    if (query.includes('http')) {
-                        const { data } = await axios.get(`https://www.tikwm.com/api/?url=${query}`);
-                        if (data.code === 0) {
-                            return await sock.sendMessage(from, { video: { url: data.data.play }, caption: `✅ *Video Descargado*\n🤖 By: ${BotName}\n` }, { quoted: m });
+                if (/image|video|webp/.test(mime)) {
+                    // Validación de duración para videos (máximo 10 seg)
+                    if (msg.videoMessage && msg.videoMessage.seconds > 10) {
+                        return sock.sendMessage(from, { text: '⚠️ El video no puede durar más de 10 segundos.' }, { quoted: m });
+                    }
+
+                    await sock.sendMessage(from, { react: { text: '🎨', key: m.key } });
+
+                    try {
+                        const type = mime.split('/')[0];
+                        const stream = await downloadContentFromMessage(msg[Object.keys(msg)[0]], type);
+                        
+                        // Convertimos el stream a buffer
+                        let buffer = Buffer.from([]);
+                        for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+
+                        // Nombres temporales seguros
+                        const ext = type === 'image' ? 'jpg' : 'mp4';
+                        const tempFile = `./temp_stick_${Date.now()}.${ext}`;
+                        const tempOut = `./sticker_${Date.now()}.webp`;
+
+                        fs.writeFileSync(tempFile, buffer);
+
+                        // Comando FFmpeg PRO (Centrado, sin bordes negros, calidad alta)
+                        let ffmpegCmd = `ffmpeg -i ${tempFile} -vcodec libwebp -filter:v "scale='min(320,iw)':min'(320,ih)':force_original_aspect_ratio=decrease,fps=15, pad=320:320:-1:-1:color=white@0.0, split [a][b]; [a] palettegen=reserve_transparent=on:transparency_color=ffffff [p]; [b][p] paletteuse" -f webp ${tempOut}`;
+
+                        // Si es video, ajustamos parámetros para animación
+                        if (type !== 'image') {
+                            ffmpegCmd = `ffmpeg -i ${tempFile} -vcodec libwebp -filter:v "scale='min(320,iw)':min'(320,ih)':force_original_aspect_ratio=decrease,fps=15, pad=320:320:-1:-1:color=white@0.0, split [a][b]; [a] palettegen=reserve_transparent=on:transparency_color=ffffff [p]; [b][p] paletteuse" -loop 0 -ss 00:00:00 -t 00:00:10 -preset default -an -vsync 0 -s 512:512 ${tempOut}`;
                         }
-                    } else {
-                        const { data } = await axios.get(`https://www.tikwm.com/api/feed/search?keywords=${encodeURIComponent(query)}`);
+
+                        exec(ffmpegCmd, async (err) => {
+                            // Borramos el archivo original (Input) para no llenar memoria
+                            if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
+
+                            if (err) {
+                                console.log("Error FFmpeg:", err);
+                                return sock.sendMessage(from, { text: '❌ Error al crear sticker.' }, { quoted: m });
+                            }
+
+                            // Enviamos el sticker final
+                            await sock.sendMessage(from, { sticker: fs.readFileSync(tempOut) }, { quoted: m });
+
+                            // Borramos el resultado (Output)
+                            if (fs.existsSync(tempOut)) fs.unlinkSync(tempOut);
+                        });
+
+                    } catch (e) {
+                        console.log(e);
+                        await sock.sendMessage(from, { text: '❌ Error interno.' }, { quoted: m });
+                    }
+                } else {
+                    await sock.sendMessage(from, { text: '⚠️ Eso no es una imagen o video válido.' }, { quoted: m });
+                }
+            break; 
+
+
+            // ==========================================
+            // 🏓 COMANDO: PING (DASHBOARD PRO CORREGIDO)
+            // ==========================================
+            case 'ping': case 'p': case 'velocidad':
+                // 1. Reacción rápida
+                await sock.sendMessage(from, { react: { text: "⚡", key: m.key } });
+
+                // 2. Calculamos datos técnicos reales
+                const velocidad = Date.now() - (m.messageTimestamp * 1000);
+                const ram = (process.memoryUsage().rss / 1024 / 1024).toFixed(2);
+                
+                // 3. Calculamos tiempo activo (Uptime)
+                const segundosTotales = Math.floor(process.uptime());
+                const horas = Math.floor(segundosTotales / 3600);
+                const minutos = Math.floor((segundosTotales % 3600) / 60); // Variable corregida
+                const segundos = segundosTotales % 60;
+
+                // 4. Diseño "Dashboard"
+                const textoPing = `
+🏓 *PONG!* ───────────────
+🚀 *Velocidad:* ${velocidad}ms
+💾 *RAM Usada:* ${ram} MB
+⏳ *Activo:* ${horas}h ${minutos}m ${segundos}s
+🤖 *Estado:* ✅ Online
+───────────────
+> ${ownerData.botName} System`.trim();
+
+                await sock.sendMessage(from, { text: textoPing }, { quoted: m });
+            break; 
+
+
+            // ==========================================
+            // 🎵 COMANDO: TIKTOK (LINK Y BÚSQUEDA X4)
+            // ==========================================
+            case 'tt': case 'tiktok':
+                // Usamos la variable global 'text' para que funcione con cualquier prefijo
+                if (!text) return sock.sendMessage(from, { text: '⚠️ Escribe el enlace o una búsqueda.\nEj: .tt gatos graciosos' }, { quoted: m });
+
+                await sock.sendMessage(from, { react: { text: "🎵", key: m.key } });
+
+                try {
+                    // MODO 1: ES UN LINK (Descarga directa)
+                    if (text.includes('http')) {
+                        const { data } = await axios.get(`https://www.tikwm.com/api/?url=${text}`);
+                        
+                        if (data.code === 0) {
+                            await sock.sendMessage(from, { 
+                                video: { url: data.data.play }, 
+                                caption: `✅ *TikTok Descargado*\n👤 *Autor:* ${data.data.author.nickname}\n🤖 By: ${ownerData.botName}` 
+                            }, { quoted: m });
+                        } else {
+                            await sock.sendMessage(from, { text: '❌ Enlace privado o inválido.' }, { quoted: m });
+                        }
+                    } 
+                    // MODO 2: ES UNA BÚSQUEDA (Envía 4 videos)
+                    else {
+                        await sock.sendMessage(from, { text: `🔍 *Buscando 4 videos de:* ${text}...` }, { quoted: m });
+                        const { data } = await axios.get(`https://www.tikwm.com/api/feed/search?keywords=${encodeURIComponent(text)}`);
                         if (data.data && data.data.videos) {
+                            // Tomamos máximo 4 videos
                             const videos = data.data.videos.slice(0, 4); 
                             for (let i = 0; i < videos.length; i++) {
                                 const v = videos[i];
-                                await sock.sendMessage(from, { video: { url: v.play }, caption: `🎥 *Video ${i + 1}/4*\n📌 ${v.title}\n🤖 By: ${BotName}\n` }, { quoted: m });
-                                if (i < videos.length - 1) { await new Promise(res => setTimeout(res, 2500)); }
+                                await sock.sendMessage(from, { 
+                                    video: { url: v.play }, 
+                                    caption: `🎥 *Video ${i + 1}/4*\n📌 *Título:* ${v.title}\n🤖 By: ${ownerData.botName}` 
+                                }, { quoted: m });
+
+                                // Pequeña pausa de 2.5s entre videos para no saturar WhatsApp
+                                if (i < videos.length - 1) { 
+                                    await new Promise(res => setTimeout(res, 2500)); 
+                                }
                             }
                             await sock.sendMessage(from, { text: '✅ ¡Listo! 4 videos enviados.' }, { quoted: m });
                         } else {
-                            await sock.sendMessage(from, { text: '❌ No encontré nada.' }, { quoted: m });
+                            await sock.sendMessage(from, { text: '❌ No encontré videos sobre eso.' }, { quoted: m });
                         }
                     }
                 } catch (e) {
-                    console.log(e);
-                    await sock.sendMessage(from, { text: '❌ Error al descargar.' }, { quoted: m });
+                    console.log("Error TikTok:", e);
+                    await sock.sendMessage(from, { text: '❌ Error al intentar descargar.' }, { quoted: m });
                 }
-           break; }
-
-            // ==========================================
-            // 💎 SISTEMA DE BIENVENIDAS Y DESPEDIDAS (FULL)
-            // ==========================================
-            const esCmdWelcome = body.startsWith('.welcome') || body.startsWith('.setwel') || 
-                                 body.startsWith('.welaudi') || body.startsWith('.delwe') || 
-                                 body.startsWith('.delaudio'); // Agregamos .delaudio aquí para que lo detecte
-
-            if (esCmdWelcome) {
-                // Solo calculamos Admin si el usuario intenta configurar algo
-                const groupMetadata = isGroup ? await sock.groupMetadata(from) : null;
-                const isAdmin = groupMetadata ? groupMetadata.participants.find(p => p.id === sender)?.admin : false;
-
-                // --- 1. ACTIVAR / DESACTIVAR ---
-                if (body === '.welcome on' || body === '.welcome off' || body === '.welcome2 on' || body === '.welcome2 off') {
-                    if (!esOwner && !isAdmin) return sock.sendMessage(from, { text: '⛔ Solo admins o mi owner.' }, { quoted: m });
-                    
-                    const esIn = body.includes('2'); // Si tiene "2" es Entrada, si no es Salida
-                    const db = esIn ? welcome2DB : welcomeDB;
-                    
-                    db.status[from] = body.includes('on');
-                    esIn ? guardarWelcome2() : guardarWelcome();
-                    await sock.sendMessage(from, { text: `✨ Sistema de ${esIn ? 'BIENVENIDAS' : 'DESPEDIDAS'} ${body.includes('on') ? 'ACTIVADO' : 'DESACTIVADO'} con éxito.` }, { quoted: m });
-                }
-
-                // --- 2. CONFIGURAR FOTO / VIDEO (.setwel) ---
-                if (body === '.setwel' || body === '.setwel2') {
-                    if (!esOwner && !isAdmin) return;
-                    const db = body === '.setwel' ? welcomeDB : welcome2DB;
-                    if (db.files.length >= 7) return sock.sendMessage(from, { text: '⚠️ Cupos llenos (7/7).' }, { quoted: m });
-                    
-                    const quoted = m.message.extendedTextMessage?.contextInfo?.quotedMessage;
-                    const mime = quoted ? Object.keys(quoted)[0] : null;
-                    if (mime !== 'imageMessage' && mime !== 'videoMessage') return sock.sendMessage(from, { text: '📸 Responde a una foto o video para establecerla.' }, { quoted: m });
-
-                    const buffer = await downloadContentFromMessage(quoted[mime], mime === 'imageMessage' ? 'image' : 'video');
-                    let buf = Buffer.from([]); for await (const chunk of buffer) buf = Buffer.concat([buf, chunk]);
-                    const path = `./media_${Date.now()}.${mime === 'imageMessage' ? 'jpg' : 'mp4'}`;
-                    fs.writeFileSync(path, buf);
-                    db.files.push({ path, type: mime === 'imageMessage' ? 'image' : 'video' });
-                    body === '.setwel' ? guardarWelcome() : guardarWelcome2();
-                    await sock.sendMessage(from, { text: `✅ Archivo guardado. Cupos usados: ${db.files.length}/7` }, { quoted: m });
-                }
-
-                // --- 3. CONFIGURAR AUDIO (.welaudi) ---
-                if (body === '.welaudi' || body === '.welaudi2') {
-                    if (!esOwner && !isAdmin) return;
-                    const db = body === '.welaudi' ? welcomeDB : welcome2DB;
-                    if (db.audios.length >= 4) return sock.sendMessage(from, { text: '⚠️ Cupos de audio llenos (4/4).' }, { quoted: m });
-                    
-                    const quoted = m.message.extendedTextMessage?.contextInfo?.quotedMessage;
-                    if (!quoted || !quoted.audioMessage) return sock.sendMessage(from, { text: '🎵 Por favor, responde a una NOTA DE VOZ o CANCIÓN.' }, { quoted: m });
-
-                    const buffer = await downloadContentFromMessage(quoted.audioMessage, 'audio');
-                    let buf = Buffer.from([]); for await (const chunk of buffer) buf = Buffer.concat([buf, chunk]);
-                    const path = `./audio_${Date.now()}.mp3`;
-                    fs.writeFileSync(path, buf);
-                    db.audios.push(path);
-                    body === '.welaudi' ? guardarWelcome() : guardarWelcome2();
-                    await sock.sendMessage(from, { text: `✅ Audio correcto guardado. Cupos: ${db.audios.length}/4` }, { quoted: m });
-                }
-
-                // --- 4. BORRAR (.delwe / .delaudio) ---
-                // Aquí está la lógica exacta que pediste:
-                if (body.startsWith('.delwe') || body.startsWith('.delaudio')) {
-                    if (!esOwner && !isAdmin) return;
-                    
-                    // ¿Qué vamos a borrar?
-                    const esAudio = body.includes('audio'); // Si escribiste .delaudio... es Audio
-                    const esIn = body.includes('2');        // Si escribiste ...2 (ej: .delaudio2) es Bienvenida
-                    
-                    // Seleccionamos la base de datos correcta
-                    const db = esIn ? welcome2DB : welcomeDB;
-                    
-                    // Obtenemos el número (ej: .delaudio 2 -> index 1)
-                    const index = parseInt(body.split(' ')[1]) - 1;
-                    const lista = esAudio ? db.audios : db.files;
-                    
-                    if (isNaN(index) || !lista[index]) return sock.sendMessage(from, { text: '❌ Número inválido. Escribe el número del archivo a borrar.' }, { quoted: m });
-                    
-                    // Borrado físico del archivo
-                    const borrar = esAudio ? lista[index] : lista[index].path;
-                    if (fs.existsSync(borrar)) fs.unlinkSync(borrar);
-                    
-                    // Borrado de la lista
-                    lista.splice(index, 1);
-                    
-                    esIn ? guardarWelcome2() : guardarWelcome();
-                    
-                    const tipo = esAudio ? "AUDIO" : "IMAGEN/VIDEO";
-                    const lugar = esIn ? "BIENVENIDAS" : "DESPEDIDAS";
-                    await sock.sendMessage(from, { text: `🗑️ ${tipo} eliminado de ${lugar} correctamente.` }, { quoted: m });
-                }
-            }
-
+            break;
 
 
 
             // ==========================================
             // ℹ️ COMANDO: INFORMACIÓN DEL SISTEMA
             // ==========================================
-             switch (command) { case 'info': case 'estado':
-                const uptime = process.uptime();
-                const horas = Math.floor(uptime / 3600);
-                const minutos = Math.floor((uptime % 3600) / 60);
-                const segundos = Math.floor(uptime % 60);
-                const ram = (process.memoryUsage().rss / 1024 / 1024).toFixed(2);
-                const speed = new Date().getTime() - (m.messageTimestamp * 1000);
-                const textoInfo = `💻 *INFORMACIÓN DEL SISTEMA* 💻\n\n👑 *Creador:* Criss\n🤖 *Bot:* ${BotName}\n🚀 *Velocidad:* ${speed}ms\n⏳ *Tiempo Activo:* ${horas}h ${minutos}m ${segundos}s\n💾 *RAM Usada:* ${ram} MB\n📱 *Plataforma:* Termux (Android)\n📚 *Base:* Baileys (JavaScript)\n🛡️ *Versión:* 1.0.0`;
+            case 'info': case 'estado': case 'infobot':
+                await sock.sendMessage(from, { react: { text: "💻", key: m.key } });
+
+                // 1. Calculamos el Uptime (Tiempo activo)
+                const uptimeInfo = process.uptime();
+                const horasInfo = Math.floor(uptimeInfo / 3600);
+                const minutosInfo = Math.floor((uptimeInfo % 3600) / 60);
+                const segundosInfo = Math.floor(uptimeInfo % 60);
+
+                // 2. Calculamos RAM y Velocidad
+                const ramInfo = (process.memoryUsage().rss / 1024 / 1024).toFixed(2);
+                const speedInfo = Date.now() - (m.messageTimestamp * 1000);
+
+                // 3. Diseño del Mensaje (Usando tus datos reales)
+                const textoInfo = `
+💻 *INFORMACIÓN DEL SISTEMA* 💻
+───────────────
+👑 *Creador:* ${ownerData.nombre}
+🤖 *Bot:* ${ownerData.botName}
+🚀 *Velocidad:* ${speedInfo}ms
+⏳ *Tiempo Activo:* ${horasInfo}h ${minutosInfo}m ${segundosInfo}s
+💾 *RAM Usada:* ${ramInfo} MB
+📱 *Plataforma:* Termux (Android)
+📚 *Base:* Baileys (JavaScript)
+🛡️ *Versión:* 1.0.0 Pro
+───────────────`.trim();
+
                 await sock.sendMessage(from, { text: textoInfo }, { quoted: m });
-           break; }
+            break;
+
 
             // ==========================================
-            // 💿 COMANDO: PLAY (MÚSICA Y VIDEO)
+            // 💿 COMANDO: PLAY (MÚSICA Y VIDEO - YTDL)
             // ==========================================
-               switch (command) { case 'play':
-                const isVideo = !body.startsWith('.play2');
-               const query = body.replace(isVideo ? '.play' : '.play2', '').trim();
-                if (!query) return sock.sendMessage(from, { text: '⚠️ Escribe el nombre.' }, { quoted: m });
-                await sock.sendMessage(from, { text: `🔍 *Buscando:* ${query}...` }, { quoted: m });
+            case 'play': case 'play2':
+                // 1. Validación de texto
+                if (!text) return sock.sendMessage(from, { text: '⚠️ Escribe el nombre de la canción o video.' }, { quoted: m });
+
+                // 🔄 CAMBIO SOLICITADO: .play es VIDEO, .play2 es AUDIO
+                const isVideo = command === 'play'; 
+
+                // Reacción según lo que se va a descargar
+                await sock.sendMessage(from, { react: { text: isVideo ? "🎥" : "🎧", key: m.key } });
+                await sock.sendMessage(from, { text: `🔍 *Buscando:* ${text}...` }, { quoted: m });
+
                 try {
-                    const search = await yts(query);
+                    // 2. Buscamos en YouTube
+                    const search = await yts(text);
                     const video = search.all[0];
-                    if (!video) return sock.sendMessage(from, { text: '❌ No encontrado.' }, { quoted: m });
-                    await sock.sendMessage(from, { image: { url: video.thumbnail }, caption: `💿 *ENCONTRADO*\n📌 ${video.title}\n🚀 *Descargando ${isVideo ? 'Video' : 'Audio'}...*` }, { quoted: m });
 
-                    const nombreArchivo = `descargas/${Date.now()}.${isVideo ? 'mp4' : 'mp3'}`;
-                    const stream = ytdl(video.url, { quality: isVideo ? 'lowest' : 'highestaudio', filter: isVideo ? 'audioandvideo' : 'audioonly' });
+                    if (!video) return sock.sendMessage(from, { text: '❌ No encontré resultados.' }, { quoted: m });
+
+                    // 3. Tarjeta de información
+                    await sock.sendMessage(from, { 
+                        image: { url: video.thumbnail }, 
+                        caption: `💿 *ENCONTRADO*\n📌 *Título:* ${video.title}\n⏱️ *Duración:* ${video.timestamp}\n🚀 *Descargando ${isVideo ? 'Video' : 'Audio'}...*` 
+                    }, { quoted: m });
+
+                    // 4. Preparar descarga
+                    const nombreArchivo = `./temp_${Date.now()}.${isVideo ? 'mp4' : 'mp3'}`;
+                    
+                    // Configuración de YTDL (Intentando saltar bloqueo)
+                    const stream = ytdl(video.url, { 
+                        quality: isVideo ? 'lowest' : 'highestaudio', 
+                        filter: isVideo ? 'audioandvideo' : 'audioonly',
+                    });
+
                     const fileWriter = fs.createWriteStream(nombreArchivo);
                     stream.pipe(fileWriter);
 
+                    // 5. Finalización y Envío
                     fileWriter.on('finish', async () => {
-                        if (isVideo) {
-                            await sock.sendMessage(from, { video: { url: nombreArchivo }, caption: `🎥 *${video.title}*\n🤖 By: ${BotName}` }, { quoted: m });
-                        } else {
-                            await sock.sendMessage(from, { audio: { url: nombreArchivo }, mimetype: 'audio/mpeg', ptt: false }, { quoted: m });
+                        try {
+                            if (isVideo) {
+                                await sock.sendMessage(from, { 
+                                    video: { url: nombreArchivo }, 
+                                    caption: `🎥 *${video.title}*\n🤖 By: ${ownerData.botName}` 
+                                }, { quoted: m });
+                            } else {
+                                await sock.sendMessage(from, { 
+                                    audio: { url: nombreArchivo }, 
+                                    mimetype: 'audio/mp4', // Formato más compatible para WhatsApp
+                                    ptt: false 
+                                }, { quoted: m });
+                            }
+                        } catch (errEnvio) {
+                            console.log("Error al enviar archivo:", errEnvio);
                         }
-                        fs.unlinkSync(nombreArchivo);
+
+                        // Limpieza
+                        if (fs.existsSync(nombreArchivo)) fs.unlinkSync(nombreArchivo);
+                        await sock.sendMessage(from, { react: { text: "✅", key: m.key } });
                     });
+
+                    // Manejo de Errores de YouTube (403 Forbidden)
                     stream.on('error', (err) => {
-                        sock.sendMessage(from, { text: '❌ Error en la descarga.' }, { quoted: m });
+                        console.log("Error YTDL Stream:", err);
+                        sock.sendMessage(from, { text: '❌ YouTube bloqueó la descarga (Error de IP). Intenta más tarde.' }, { quoted: m });
+                        if (fs.existsSync(nombreArchivo)) fs.unlinkSync(nombreArchivo);
                     });
+
                 } catch (e) {
-                    await sock.sendMessage(from, { text: '❌ Error al procesar.' }, { quoted: m });
+                    console.log(e);
+                    await sock.sendMessage(from, { text: '❌ Error al procesar el comando.' }, { quoted: m });
                 }
-           break; }
-
-
-// ==========================================
-// 🧠 COMANDO: IA (SERVIDOR WIDIPE - ESTABLE)
-// ==========================================
-   switch (command) { case 'ia': case 'chatgpt':
-    const text = body.slice(body.indexOf(' ') + 1).trim();
-    if (body.split(' ').length < 2) return sock.sendMessage(from, { text: `🤖 Dime, ¿qué necesitas?` }, { quoted: m });
-
-    await sock.sendMessage(from, { react: { text: "🧠", key: m.key } });
-
-    try {
-        // Servidor Widipe (Muy rápido)
-        const { data } = await axios.get(`https://widipe.com.ua/api/ai/chatgpt?text=${encodeURIComponent(text)}`);
-        
-        if (data && data.result) {
-            await sock.sendMessage(from, { text: `🤖 *${ownerData.botName}:*\n\n${data.result}` }, { quoted: m });
-        } else {
-            throw new Error("Sin respuesta");
-        }
-    } catch (e) {
-        // Respaldo SimSimi
-        try {
-            const { data } = await axios.get(`https://api.simsimi.vn/v2/simsimi?text=${encodeURIComponent(text)}&lc=es`);
-            if (data.success) await sock.sendMessage(from, { text: `🤖 ${data.success}` }, { quoted: m });
-        } catch (e2) {
-            await sock.sendMessage(from, { text: "❌ Error fatal en IA." }, { quoted: m });
-        }
-    }
-break; }
+            break;
 
 
 
 
 
             // ==========================================
-            // 💎 COMANDO: HD (REMASTERIZAR)
+            // 🧠 COMANDO: INTELIGENCIA ARTIFICIAL (CASCADA PRO)
             // ==========================================
-               switch (command) { case 'hd':
-                const getMedia = (msg) => {
+            case 'ia': case 'chatgpt': case 'gpt': case 'bot':
+                // 1. Usamos la variable global 'text'
+                if (!text) return sock.sendMessage(from, { text: `🤖 Hola *${pushName}*, soy ${ownerData.botName}. \n\n¿En qué puedo ayudarte? Escribe tu pregunta después del comando.` }, { quoted: m });
+
+                await sock.sendMessage(from, { react: { text: "🧠", key: m.key } });
+
+                // 2. Definimos la personalidad del Bot
+                const promptSistema = `Tu nombre es ${ownerData.botName}, un asistente de WhatsApp útil, sarcástico y divertido creado por ${ownerData.nombre}. Responde siempre en español y usa emojis.`;
+
+                try {
+                    // ---------------------------------------------------------
+                    // 🟢 INTENTO 1: POLLINATIONS (La más potente y estable actual)
+                    // ---------------------------------------------------------
+                    // Esta API soporta GPT-4o-mini gratis y suele dar respuestas largas
+                    const url1 = `https://text.pollinations.ai/${encodeURIComponent(promptSistema + " La pregunta es: " + text)}`;
+                    const res1 = await axios.get(url1);
+                    
+                    if (res1.data) {
+                        return await sock.sendMessage(from, { text: `🤖 *${ownerData.botName}:*\n\n${res1.data}` }, { quoted: m });
+                    }
+                    throw new Error("Falló Pollinations");
+
+                } catch (e1) {
+                    try {
+                        // ---------------------------------------------------------
+                        // 🟡 INTENTO 2: HERCAI (Respaldo sólido)
+                        // ---------------------------------------------------------
+                        const url2 = `https://hercai.onrender.com/v3/hercai?question=${encodeURIComponent(text)}`;
+                        const res2 = await axios.get(url2);
+                        if (res2.data && res2.data.reply) {
+                            return await sock.sendMessage(from, { text: `🤖 *${ownerData.botName} (R):*\n\n${res2.data.reply}` }, { quoted: m });
+                        }
+                        throw new Error("Falló Hercai");
+
+                    } catch (e2) {
+                        try {
+                            // ---------------------------------------------------------
+                            // 🔴 INTENTO 3: SIMSIMI (Último recurso, respuestas cortas)
+                            // ---------------------------------------------------------
+                            const url3 = `https://api.simsimi.vn/v2/simsimi?text=${encodeURIComponent(text)}&lc=es`;
+                            const res3 = await axios.get(url3);
+                            if (res3.data && res3.data.success) {
+                                return await sock.sendMessage(from, { text: `🤖 ${res3.data.success}` }, { quoted: m });
+                            }
+                            throw new Error("Falló todo");
+
+                        } catch (e3) {
+                            // Si absolutamente todo falla:
+                            console.log("Error Total IA:", e3);
+                           await sock.sendMessage(from, { text: "❌ Mis neuronas están apagadas. Intenta más tarde." }, { quoted: m });
+                        }
+                    }
+                }
+            break;
+
+
+
+            // ==========================================
+            // 💎 COMANDO: HD (REMASTERIZAR FOTO Y VIDEO)
+            // ==========================================
+            case 'hd': case 'remini':
+                // 1. Función rápida para detectar el medio (Foto/Video/ViewOnce)
+                const getMedia = (m) => {
+                    const msg = m.message?.extendedTextMessage?.contextInfo?.quotedMessage;
                     if (!msg) return null;
-                    if (msg.imageMessage) return { m: msg.imageMessage, t: 'image' };
-                    if (msg.videoMessage) return { m: msg.videoMessage, t: 'video' };
-                    if (msg.viewOnceMessage?.message?.imageMessage) return { m: msg.viewOnceMessage.message.imageMessage, t: 'image' };
+                    if (msg.imageMessage) return { m: msg.imageMessage, type: 'image' };
+                    if (msg.videoMessage) return { m: msg.videoMessage, type: 'video' };
+                    if (msg.viewOnceMessage?.message?.imageMessage) return { m: msg.viewOnceMessage.message.imageMessage, type: 'image' };
+                    if (msg.viewOnceMessage?.message?.videoMessage) return { m: msg.viewOnceMessage.message.videoMessage, type: 'video' };
                     return null;
                 };
 
-                let target = m.message;
-                let media = getMedia(target);
-                
-                if (!media && m.message.extendedTextMessage?.contextInfo?.quotedMessage) {
-                    target = m.message.extendedTextMessage.contextInfo.quotedMessage;
-                    media = getMedia(target);
+                const mediaData = getMedia(m);
+
+                if (!mediaData) {
+                    return sock.sendMessage(from, { text: '⚠️ Responde a una foto o video con *.hd*' }, { quoted: m });
                 }
 
-                if (!media) return sock.sendMessage(from, { text: '⚠️ Responde a una foto o video con .hd' }, { quoted: m });
-
-                await sock.sendMessage(from, { text: '💎 *Mejorando calidad...* (Esto puede tardar un poco)' }, { quoted: m });
+                await sock.sendMessage(from, { react: { text: "💎", key: m.key } });
+                await sock.sendMessage(from, { text: '💎 *Procesando mejora...* (Esto puede tardar unos segundos)' }, { quoted: m });
 
                 try {
-                    const stream = await downloadContentFromMessage(media.m, media.t);
-                    const buffer = await bufferToData(stream);
-                    const ext = media.t === 'image' ? 'jpg' : 'mp4';
-                    const inp = `./temp_hd_${Date.now()}.${ext}`;
-                    const out = `./hd_${Date.now()}.${ext}`;
-                    fs.writeFileSync(inp, buffer);
+                    // 2. Descargar el archivo
+                    const stream = await downloadContentFromMessage(mediaData.m, mediaData.type);
+                    let buffer = Buffer.from([]);
+                    for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
 
-                    let command = '';
-                    if (media.t === 'image') {
-                        command = `ffmpeg -i ${inp} -vf "scale=iw*2:ih*2,unsharp=5:5:1.0:5:5:0.0" -q:v 2 ${out}`;
+                    // Nombres temporales
+                    const ext = mediaData.type === 'image' ? 'jpg' : 'mp4';
+                    const tempIn = `./temp_hd_in_${Date.now()}.${ext}`;
+                    const tempOut = `./hd_out_${Date.now()}.${ext}`;
+
+                    fs.writeFileSync(tempIn, buffer);
+
+                    // 3. Construir comando FFmpeg (Sin conflicto de variables)
+                    let ffmpegCmd = '';
+                    if (mediaData.type === 'image') {
+                        // Filtro para fotos: Escala x2 + Enfoque (Unsharp)
+                        ffmpegCmd = `ffmpeg -i ${tempIn} -vf "scale=iw*2:ih*2,unsharp=5:5:1.0:5:5:0.0" -q:v 2 ${tempOut}`;
                     } else {
-                        command = `ffmpeg -i ${inp} -vf "scale=iw*2:ih*2:flags=lanczos,unsharp=5:5:1.0:5:5:0.0" -c:v libx264 -preset fast -crf 23 -c:a copy ${out}`;
+                        // Filtro para videos: Escala x2 + Enfoque + Codec rápido
+                        ffmpegCmd = `ffmpeg -i ${tempIn} -vf "scale=iw*2:ih*2:flags=lanczos,unsharp=5:5:1.0:5:5:0.0" -c:v libx264 -preset fast -crf 23 -c:a copy ${tempOut}`;
                     }
 
-                    exec(command, async (err) => {
+                    // 4. Ejecutar la magia
+                    exec(ffmpegCmd, async (err) => {
+                        // Borrar entrada inmediatamente para ahorrar espacio
+                        if (fs.existsSync(tempIn)) fs.unlinkSync(tempIn);
+
                         if (err) {
                             console.log("Error FFmpeg HD:", err);
-                            try { fs.unlinkSync(inp); } catch {}
-                            return sock.sendMessage(from, { text: '❌ El video es muy pesado o hubo error.' }, { quoted: m });
+                            return sock.sendMessage(from, { text: '❌ El archivo es muy pesado o corrupto.' }, { quoted: m });
                         }
-                        if (media.t === 'image') {
-                            await sock.sendMessage(from, { image: fs.readFileSync(out), caption: '💎 *HD Mejorado*' }, { quoted: m });
+
+                        // Enviar resultado
+                        if (mediaData.type === 'image') {
+                            await sock.sendMessage(from, { 
+                                image: fs.readFileSync(tempOut), 
+                                caption: '💎 *Calidad Mejorada (HD)*' 
+                            }, { quoted: m });
                         } else {
-                            await sock.sendMessage(from, { video: fs.readFileSync(out), caption: '💎 *Video Remasterizado*' }, { quoted: m });
+                            await sock.sendMessage(from, { 
+                                video: fs.readFileSync(tempOut), 
+                                caption: '💎 *Video Remasterizado*' 
+                            }, { quoted: m });
                         }
-                        try { fs.unlinkSync(inp); fs.unlinkSync(out); } catch {}
+
+                        // Borrar salida
+                        if (fs.existsSync(tempOut)) fs.unlinkSync(tempOut);
+                        await sock.sendMessage(from, { react: { text: "✨", key: m.key } });
                     });
 
                 } catch (e) {
                     console.log(e);
-                    sock.sendMessage(from, { text: '❌ Error al procesar.' }, { quoted: m });
+                    await sock.sendMessage(from, { text: '❌ Error interno al procesar.' }, { quoted: m });
                 }
-          break;  }
+            break;
 
-
-
-// ==========================================
-// 🔎 COMANDO: GOOGLE IMAGE SEARCH (.imagen)
-// ==========================================
-   switch (command) { case 'imagen':
-    const text = body.slice(body.indexOf(' ') + 1).trim();
-    if (body.split(' ').length < 2) return sock.sendMessage(from, { text: '❀ Por favor, ingrese un texto para buscar.' }, { quoted: m });
-
-    await sock.sendMessage(from, { react: { text: "🕒", key: m.key } });
-
-    // Función interna para buscar imágenes (Lógica adaptada)
-    async function googleSearch(query) {
-        try {
-            // INTENTO 1: API Delirius (La que usaba tu código original)
-            const { data } = await axios.get(`https://delirius-api-oficial.vercel.app/api/gimg?query=${encodeURIComponent(query)}`);
-            if (data.status && Array.isArray(data.data)) {
-                return data.data; // Retorna array de URLs
-            }
-        } catch (e) { console.log("Falló API 1"); }
-
-        try {
-            // INTENTO 2: API Respaldo (Bing/Google Scraper)
-            const { data } = await axios.get(`https://api.vreden.web.id/api/gimage?query=${encodeURIComponent(query)}`);
-            if (data.result && Array.isArray(data.result)) {
-                return data.result;
-            }
-        } catch (e) { console.log("Falló API 2"); }
-        
-        return []; // Si todo falla
-    }
-
-    try {
-        const urls = await googleSearch(text);
-
-        if (!urls || urls.length === 0) {
-            return sock.sendMessage(from, { text: '✧ No se encontraron imágenes sobre eso.' }, { quoted: m });
-        }
-
-        // LÓGICA DE ENVÍO (Adaptada a tu bot)
-        // Enviamos máximo 5 imágenes para no hacer spam (tu código original pedía 10)
-        const limit = Math.min(5, urls.length);
-        
-        await sock.sendMessage(from, { text: `❀ *Resultados para:* ${text}\nEnviando ${limit} imágenes...` }, { quoted: m });
-
-        for (let i = 0; i < limit; i++) {
-            await sock.sendMessage(from, { 
-                image: { url: urls[i] }, 
-                caption: i === 0 ? `🤖 By: ${ownerData.botName}` : null // Solo la primera lleva nombre
-            });
-            // Pequeña pausa para que WhatsApp no bloquee el envío
-            await new Promise(r => setTimeout(r, 1000));
-        }
-
-        await sock.sendMessage(from, { react: { text: "✔️", key: m.key } });
-
-    } catch (error) {
-        console.log(error);
-        await sock.sendMessage(from, { text: `⚠︎ Ocurrió un error al buscar las imágenes.` }, { quoted: m });
-        await sock.sendMessage(from, { react: { text: "✖️", key: m.key } });
-    }
-break; }
 
 
 
             // ==========================================
-            // 🎵 COMANDO: VIDEO A MP3 (.tomp3)
+            // 🎨 COMANDO: GENERADOR DE IMÁGENES IA (POTENTE)
             // ==========================================
-               switch (command) { case 'for3':
-                const quoted = m.message.extendedTextMessage?.contextInfo?.quotedMessage;
-                if (!quoted || !quoted.videoMessage) {
-                    return sock.sendMessage(from, { text: '⚠️ Responde a un *video* con el comando *.tomp3* para convertirlo.' }, { quoted: m });
-                }
+            case 'imagen': case 'img': case 'dalle': case 'generar':
+                // 1. Validación: Necesitamos un texto (prompt)
+                if (!text) return sock.sendMessage(from, { text: `🎨 *¿Qué quieres que dibuje?*\n\nDescribe tu idea detalladamente.\nEj: *.generar un gato astronauta en la luna, estilo cyberpunk, 4k*` }, { quoted: m });
 
-                await sock.sendMessage(from, { text: '⏳ *Extrayendo audio... por favor espera.*' }, { quoted: m });
+                await sock.sendMessage(from, { react: { text: "🎨", key: m.key } });
+                // Mensaje de espera para calmar ansias
+                await sock.sendMessage(from, { text: `🧠 *Imaginando:* "${text}"...\n_Esto puede tardar unos segundos._` }, { quoted: m });
 
                 try {
-                    // Descargamos el video
-                    const stream = await downloadContentFromMessage(quoted.videoMessage, 'video');
-                    const buffer = await bufferToData(stream);
+                    // ---------------------------------------------------------
+                    // 🥇 MOTOR 1: POLLINATIONS AI (Calidad SDXL/Midjourney)
+                    // ---------------------------------------------------------
+                    // Esta API es brutal. Es rápida y la calidad es top.
+                    // Agregamos una 'seed' aleatoria para que la misma frase siempre de resultados distintos.
+                    const seed = Math.floor(Math.random() * 999999);
+                    // Usamos 'nologo=true' para intentar que salga limpia.
+                    const imageUrl1 = `https://image.pollinations.ai/prompt/${encodeURIComponent(text)}?seed=${seed}&nologo=true&width=1024&height=1024`;
 
-                    const tempIn = `./temp_vid_${Date.now()}.mp4`;
-                    const tempOut = `./temp_aud_${Date.now()}.mp3`;
-                    
-                    fs.writeFileSync(tempIn, buffer);
+                    // NOTA: Pollinations devuelve la imagen directa, así que solo mandamos la URL.
+                    // Si el servidor está caído, Baileys lanzará error al intentar descargarla y saltará al catch.
+                    await sock.sendMessage(from, {
+                        image: { url: imageUrl1 },
+                        caption: `🎨 *Generado por IA*\n📝 *Prompt:* ${text}\n🤖 By: ${ownerData.botName}`
+                    }, { quoted: m });
 
-                    // Usamos FFmpeg para convertir a mp3 (calidad 192kbps)
-                    exec(`ffmpeg -i ${tempIn} -vn -ar 44100 -ac 2 -b:a 192k ${tempOut}`, async (err) => {
-                        if (err) {
-                            console.log("Error FFmpeg:", err);
-                            return sock.sendMessage(from, { text: '❌ Hubo un error al procesar el audio.' }, { quoted: m });
+                    await sock.sendMessage(from, { react: { text: "✅", key: m.key } });
+
+                } catch (e1) {
+                    console.log("Falló Pollinations, intentando backup...", e1.message);
+                    try {
+                        // ---------------------------------------------------------
+                        // 🥈 MOTOR 2: HERCAI (Respaldo Sólido)
+                        // ---------------------------------------------------------
+                        // Hercai devuelve un JSON con la URL, así que usamos axios.
+                        const res2 = await axios.get(`https://hercai.onrender.com/v3/text2image?prompt=${encodeURIComponent(text)}`);
+
+                        if (res2.data && res2.data.url) {
+                            await sock.sendMessage(from, {
+                                image: { url: res2.data.url },
+                                caption: `🎨 *Generado por IA (Backup)*\n📝 *Prompt:* ${text}\n🤖 By: ${ownerData.botName}`
+                            }, { quoted: m });
+                            await sock.sendMessage(from, { react: { text: "✅", key: m.key } });
+                        } else {
+                            throw new Error("API Hercai no devolvió imagen");
                         }
 
-                        // Enviamos el archivo final
+                    } catch (e2) {
+                        // ---------------------------------------------------------
+                        // ❌ ERROR TOTAL (Si los dos fallan)
+                        // ---------------------------------------------------------
+                        console.log("Error Total Generar Imagen:", e2.message);
+                        await sock.sendMessage(from, { text: "❌ Mis pinceles digitales fallaron. Los servidores de IA están saturados en este momento. Intenta más tarde." }, { quoted: m });
+                    }
+                }
+            break;
+
+
+
+
+
+            // ==========================================
+            // 🎵 COMANDO: VIDEO A AUDIO (TOMP3)
+            // ==========================================
+            case 'tomp3': case 'toaudio': case 'mp3':
+                // 1. Verificamos que responda a un video
+                const msgVideo = m.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+                if (!msgVideo || !msgVideo.videoMessage) {
+                    return sock.sendMessage(from, { text: '⚠️ Responde a un video con *.tomp3* para convertirlo.' }, { quoted: m });
+                }
+
+                await sock.sendMessage(from, { react: { text: "🎼", key: m.key } });
+
+                try {
+                    // 2. Descargamos el video
+                    const stream = await downloadContentFromMessage(msgVideo.videoMessage, 'video');
+                    let buffer = Buffer.from([]);
+                    for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+
+                    // Nombres temporales
+                    const tempIn = `./temp_vid_${Date.now()}.mp4`;
+                    const tempOut = `./temp_aud_${Date.now()}.mp3`;
+                    fs.writeFileSync(tempIn, buffer);
+
+                    // 3. Convertimos con FFmpeg (Extrae audio limpio 192kbps)
+                    // -vn = Sin video, -ar 44100 = Frecuencia estándar
+                    exec(`ffmpeg -i ${tempIn} -vn -ar 44100 -ac 2 -b:a 192k ${tempOut}`, async (err) => {
+                        // Borramos el video original de inmediato para ahorrar espacio
+                        if (fs.existsSync(tempIn)) fs.unlinkSync(tempIn);
+
+                        if (err) {
+                            console.log("Error FFmpeg:", err);
+                            return sock.sendMessage(from, { text: '❌ Error al convertir el audio.' }, { quoted: m });
+                        }
+
+                        // 4. Enviamos el audio
                         await sock.sendMessage(from, { 
                             audio: fs.readFileSync(tempOut), 
                             mimetype: 'audio/mp4', 
-                            ptt: false 
+                            ptt: false // Pon 'true' si quieres que se envíe como nota de voz
                         }, { quoted: m });
 
-                        // Borramos los archivos temporales para no llenar la memoria de tu cel
-                        if (fs.existsSync(tempIn)) fs.unlinkSync(tempIn);
+                        // Borramos el audio final
                         if (fs.existsSync(tempOut)) fs.unlinkSync(tempOut);
+                        await sock.sendMessage(from, { react: { text: "✅", key: m.key } });
                     });
 
                 } catch (e) {
                     console.log(e);
-                    sock.sendMessage(from, { text: '❌ Ocurrió un fallo inesperado.' }, { quoted: m });
+                    // Limpieza de emergencia
+                    try { if (fs.existsSync(tempIn)) fs.unlinkSync(tempIn); } catch {}
+                    sock.sendMessage(from, { text: '❌ Error inesperado.' }, { quoted: m });
                 }
-           break; }
+            break;
+
+
+
+            // ==========================================
+            // 🏳️‍🌈 COMANDO: GAY (BARRA DE CARGA + VIDEO SONIDO)
+            // ==========================================
+            case 'gay':
+                // 1. Detectar a quién escanear
+                let mencionado = m.message.extendedTextMessage?.contextInfo?.participant 
+                    || m.message.extendedTextMessage?.contextInfo?.mentionedJid?.[0] 
+                    || m.key.participant; 
+
+                // 2. Calcular porcentaje
+                const porcentaje = Math.floor(Math.random() * 501); 
+
+                // 3. Frase según el resultado
+                let frase;
+                if (porcentaje < 100) frase = "🌱 Apenas un toque sutil...";
+                else if (porcentaje < 200) frase = "🌈 Con estilo y actitud...";
+                else if (porcentaje < 300) frase = "🔥 Brillando con orgullo...";
+                else if (porcentaje < 400) frase = "💃 Desbordando energía arcoíris...";
+                else frase = "💖 ¡Explosión total de arcoíris, nivel legendario!";
+
+                // 4. ANIMACIÓN DE CARGA
+                // Enviamos el mensaje inicial y guardamos su 'key' (llave) para editarlo/borrarlo
+                let { key } = await sock.sendMessage(from, { text: "🏳️‍🌈 *Escaneando...* 0%\n░░░░░░░░░░" }, { quoted: m });
+
+                const pasos = [
+                    "🏳️‍🌈 *Cargando...* 20%\n██░░░░░░░░",
+                    "🏳️‍🌈 *Cargando...* 40%\n████░░░░░░",
+                    "🏳️‍🌈 *Cargando...* 60%\n██████░░░░",
+                    "🏳️‍🌈 *Cargando...* 80%\n████████░░",
+                    "🏳️‍🌈 *¡COMPLETADO!* 100%\n██████████"
+                ];
+
+                // Bucle de animación (se edita cada 600ms para que sea fluido)
+                for (let i = 0; i < pasos.length; i++) {
+                    await new Promise(resolve => setTimeout(resolve, 600)); 
+                    await sock.sendMessage(from, { text: pasos[i], edit: key });
+                }
+
+                // 5. EL TRUCO: BORRAMOS EL MENSAJE DE CARGA
+                // Así no quedan "dos mensajes"
+                await sock.sendMessage(from, { delete: key });
+
+                // 6. ENVIAMOS EL VIDEO FINAL CON LOS DATOS
+                await sock.sendMessage(from, { 
+                    video: { url: 'https://files.catbox.moe/7lvpbf.mp4' }, 
+                    // Sin gifPlayback para que tenga SONIDO 🔊
+                    caption: `🏳️‍🌈 *RESULTADO FINAL*\n\n🧐 @${mencionado.split('@')[0]} es *${porcentaje}%* Gay.\n\n${frase}`, 
+                    mentions: [mencionado] 
+                }, { quoted: m });
+            break;
 
 
 
 
             // ==========================================
-            // 🎮 ZONA: JUEGOS Y DIVERSIÓN
+            // 🔥 COMANDO: PENETRAR (CONVERSOR GIF -> MP4)
             // ==========================================
-
-    switch (command) { case 'gay':
-    let mencionado = m.message.extendedTextMessage?.contextInfo?.participant 
-        || m.message.extendedTextMessage?.contextInfo?.mentionedJid?.[0] 
-        || m.key.participant; // si no hay menciones, toma al autor
-
-    const porcentaje = Math.floor(Math.random() * 501); // ahora hasta 500
-
-    // Barra de porcentaje (20 bloques para más detalle)
-    const totalBloques = 20;
-    const bloquesLlenos = Math.round((porcentaje / 500) * totalBloques);
-    const barra = '█'.repeat(bloquesLlenos) + '░'.repeat(totalBloques - bloquesLlenos);
-
-    // Frases dinámicas según porcentaje
-    let frase;
-    if (porcentaje < 100) frase = "🌱 Apenas un toque sutil...";
-    else if (porcentaje < 200) frase = "🌈 Con estilo y actitud...";
-    else if (porcentaje < 300) frase = "🔥 Brillando con orgullo...";
-    else if (porcentaje < 400) frase = "💃 Desbordando energía arcoíris...";
-    else frase = "💖 ¡Explosión total de arcoíris, nivel legendario!";
-
-    await sock.sendMessage(from, { 
-        text: `🏳️‍🌈 *Escáner Gay:*\n\n🧐 @${mencionado.split('@')[0]} es *${porcentaje}%* Gay.\n\n[${barra}] ${porcentaje}%\n\n${frase}`, 
-        mentions: [mencionado] 
-    });
-break; }
-
-            // ==========================================
-            // 🔥 COMANDO: PENETRAR (NSFW)
-            // ==========================================
-              switch (command) { case 'penetrar':
-                // 1. Buscamos a quién mencionar (etiqueta o mensaje respondido)
+            case 'penetrar':
+                // 1. Validar objetivo
                 let target = m.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0] || 
                              m.message?.extendedTextMessage?.contextInfo?.participant;
 
-                // Si no hay nadie, avisamos
-                if (!target) return sock.sendMessage(from, { text: '⚠️ Etiqueta a alguien o responde a su mensaje.' }, { quoted: m });
+                if (!target) return sock.sendMessage(from, { text: '⚠️ Etiqueta a alguien o responde a su mensaje para penetrarlo.' }, { quoted: m });
 
-                // 2. Preparamos el nombre
-                let userName = `@${target.split('@')[0]}`;
+                // 2. Sistema "Bolsa Mágica" (No Repetir)
+                const gifsPenetrar = [
+                    "https://files.catbox.moe/iy2ur2.gif",
+                    "https://files.catbox.moe/8sbyqg.gif",
+                    "https://files.catbox.moe/y8pyzg.gif",
+                    "https://files.catbox.moe/takpwk.gif",
+                    "https://files.catbox.moe/8jde6p.gif"
+                ];
 
-                // 3. Reacción de fuego
-                await sock.sendMessage(from, { react: { text: "🔥", key: m.key } });
+                if (!global.poolPenetrar || global.poolPenetrar.length === 0) {
+                    global.poolPenetrar = [...gifsPenetrar];
+                }
 
-                // 4. El texto (Exacto como lo pediste)
-                const responseMessage = `
+                const indiceRandom = Math.floor(Math.random() * global.poolPenetrar.length);
+                const linkGif = global.poolPenetrar[indiceRandom];
+                global.poolPenetrar.splice(indiceRandom, 1);
+
+                // 3. Preparar Texto y Reacción
+                const userName = `@${target.split('@')[0]}`;
+                const textoHard = `
 *TE HAN LLENADO LA CARA DE SEMEN POR PUTA Y ZORRA!*
 
 *Le ha metido el pene a* ${userName} *con todo y condón hasta quedar seco, has dicho "por favor más duroooooo!, ahhhhhhh, ahhhhhh, hazme un hijo que sea igual de pitudo que tú!" mientras te penetraba y luego te ha dejado en silla de ruedas!*
@@ -1176,681 +1359,1328 @@ break; }
 ${userName} 
 ✿ *YA TE HAN PENETRADO!*`;
 
-                // 5. Enviamos el mensaje con la mención funcionando
-                await sock.sendMessage(from, { 
-                    text: responseMessage, 
-                    mentions: [target] 
-                }, { quoted: m });
-           break; }
+                await sock.sendMessage(from, { react: { text: "🔥", key: m.key } });
+
+                try {
+                    // 4. EL FIX DE ORO: Descargar y Convertir
+                    // Descargamos el GIF
+                    const { data } = await axios.get(linkGif, { responseType: 'arraybuffer' });
+                    
+                    // Creamos nombres temporales
+                    const pathGif = `./temp_pen_${Date.now()}.gif`;
+                    const pathMp4 = `./temp_pen_${Date.now()}.mp4`;
+                    fs.writeFileSync(pathGif, data);
+
+                    // COMANDO FFMPEG: Convierte GIF a MP4 real para que WhatsApp no dé error
+                    // Usamos un filtro de escala para evitar errores de tamaño
+                    exec(`ffmpeg -i ${pathGif} -movflags faststart -pix_fmt yuv420p -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" ${pathMp4}`, async (err) => {
+                        // Borramos el GIF original (ya no sirve)
+                        if (fs.existsSync(pathGif)) fs.unlinkSync(pathGif);
+
+                        if (err) {
+                            console.log("Error conversión:", err);
+                            return sock.sendMessage(from, { text: '❌ Error procesando el video.' }, { quoted: m });
+                        }
+
+                        // 5. ENVIAMOS EL MP4 SÓLIDO (HD y sin errores)
+                        await sock.sendMessage(from, { 
+                            video: fs.readFileSync(pathMp4), 
+                            gifPlayback: true, // Se reproduce en bucle como GIF
+                            caption: textoHard, 
+                            mentions: [target] 
+                        }, { quoted: m });
+
+                        // Borramos el video temporal
+                        if (fs.existsSync(pathMp4)) fs.unlinkSync(pathMp4);
+                    });
+
+                } catch (e) {
+                    console.log("Error General Penetrar:", e);
+                    await sock.sendMessage(from, { text: "❌ Error de conexión con el GIF." }, { quoted: m });
+                }
+            break;
+
 
 
             // ==========================================
-            // 🔞 COMANDO: TETAS (VERIFICADO Y SIN ERRORES)
+            // 🔞 COMANDO: TETAS (MEGA-PACK 30 FUENTES + MIXER)
             // ==========================================
-               switch (command) { case 'tetas': case 'tetitas':
-                // 1. Reacción inmediata para confirmar respuesta
+            case 'tetas': case 'tetitas': case 'boobs':
+                // 1. Reacción clásica
                 await sock.sendMessage(from, { react: { text: "🔞", key: m.key } });
 
                 try {
-                    // 2. Usamos una API más estable para evitar el cuadro gris
-                    // Agregamos un número aleatorio para que no se repitan las fotos
-                    const randomId = Math.floor(Math.random() * 1000);
-                    const response = await axios.get(`https://nekobot.xyz/api/image?type=boobs&seed=${randomId}`);
-                    
-                    // --- TUS VARIABLES ORIGINALES MANTENIDAS ---
-                    let img = response.data.message; 
-                    let text = '*😋 TETAS*';
+                    // 2. VERIFICAR SI HAY FOTOS EN LA BOLSA (CACHÉ)
+                    if (!global.cacheTetas || global.cacheTetas.length === 0) {
+                        console.log("🔄 Recargando el Mega-Pack de Tetas (30 Sources)...");
 
-                    // --- ENVÍO DE IMAGEN SEGURO ---
+                        // --- LISTA MAESTRA DE 30 FUENTES (VARIEDAD TOTAL) ---
+                        const fuentesMaestras = [
+                            // Clásicos y Grandes
+                            'boobs', 'boobies', 'HugeBoobs', 'bigtits', 'stacked',
+                            // Naturales y Caída
+                            'TittyDrop', 'TheHangingBoobs', 'naturaltitties', 'homegrown', 'saggy',
+                            // Estéticos y Detalles
+                            'PerfectTits', 'pokies', 'ghostnipples', 'areolas', 'Nipples',
+                            // Acciones y Ropa
+                            'BiggerThanYouThought', 'braless', 'cleavage', 'sweatermeat', 'burstout',
+                            // Tipos específicos
+                            'smallboobs', 'Tinytits', 'PuffyNipples', 'torpedotits', 'fortyfivefiftyfive',
+                            // Contexto
+                            'onoff', 'RealGirls', 'milf', 'titstouchingtits', 'nicehooters'
+                        ];
+
+                        // ESTRATEGIA MIXER:
+                        // Elegimos 10 canales AL AZAR de los 30 para esta recarga.
+                        // Así evitamos errores por URL muy larga y mantenemos la frescura.
+                        const fuentesRandom = fuentesMaestras.sort(() => 0.5 - Math.random()).slice(0, 10).join('+');
+
+                        // Pedimos 60 fotos de golpe de esa mezcla
+                        const { data } = await axios.get(`https://meme-api.com/gimme/${fuentesRandom}/60`);
+
+                        // 3. FILTRADO ESTRICTO (Solo imágenes HD)
+                        let fotosLimpias = data.memes.filter(meme => {
+                            const ext = meme.url.split('.').pop().toLowerCase();
+                            // Solo JPG/PNG, nada de videos que rompen el comando
+                            return (ext === 'jpg' || ext === 'png' || ext === 'jpeg');
+                        });
+
+                        // 4. BARAJAR EL MAZO (SHUFFLE) 🃏
+                        // Mezclamos todo para que no salgan ordenadas por canal
+                        for (let i = fotosLimpias.length - 1; i > 0; i--) {
+                            const j = Math.floor(Math.random() * (i + 1));
+                            [fotosLimpias[i], fotosLimpias[j]] = [fotosLimpias[j], fotosLimpias[i]];
+                        }
+
+                        // Guardamos en la memoria global
+                        global.cacheTetas = fotosLimpias;
+                        console.log(`✅ Cache Tetas recargado con ${global.cacheTetas.length} fotos únicas.`);
+                    }
+
+                    // 5. SACAR FOTO (EXTRAER Y BORRAR)
+                    if (global.cacheTetas.length === 0) throw new Error("No quedaron fotos validas");
+                    const imagen = global.cacheTetas.pop(); // Saca la última y la borra
+
+                    // 6. ENVIAR (INSTANTÁNEO)
                     await sock.sendMessage(from, { 
-                        image: { url: img }, 
-                        caption: text 
+                        image: { url: imagen.url }, 
+                        caption: '*😋 TETAS*' // Tu texto original
                     }, { quoted: m });
 
                 } catch (e) {
-                    // Si la API principal falla, este respaldo envía una de Reddit
-                    console.log("Error en comando tetas:", e.message);
-                    const backup = await axios.get('https://meme-api.com/gimme/boobs');
+                    console.log("Error Tetas:", e.message);
+                    // Respaldo de emergencia (Nekobot)
+                    try {
+                        const backup = await axios.get(`https://nekobot.xyz/api/image?type=boobs`);
+                        await sock.sendMessage(from, { 
+                            image: { url: backup.data.message }, 
+                            caption: '*😋 TETAS*' 
+                        }, { quoted: m });
+                    } catch (e2) {
+                        await sock.sendMessage(from, { text: "❌ Error: Intenta de nuevo." }, { quoted: m });
+                    }
+                }
+            break;
+
+
+
+            // ==========================================
+            // 🔞 COMANDO: VAGINA (MEGA-PACK 30 FUENTES + TEXTO LIMPIO)
+            // ==========================================
+            case 'vagina': case 'pussy': case 'concha': case 'panocha': case 'vag':
+                // 1. Reacción
+                await sock.sendMessage(from, { react: { text: "🥵", key: m.key } });
+
+                try {
+                    // 2. VERIFICAR CACHÉ (BOLSA DE FOTOS)
+                    if (!global.cachePussy || global.cachePussy.length === 0) {
+                        
+                        console.log("🔄 Recargando Mega-Pack Vagina (30 Sources)...");
+
+                        // --- LISTA MAESTRA (30 FUENTES) ---
+                        const fuentesMaestras = [
+                            'godpussy', 'perfectpussies', 'Innies', 'LipsThatGrip', 'SpreadEm',
+                            'cleanpussy', 'shavedpussy', 'HairyPussy', 'bush', 'PussyMound',
+                            'grool', 'wet', 'squirt', 'PussyJuice', 'Msdrool',
+                            'rearpussy', 'PussyGap', 'upskirt', 'PresentingPussy', 'Simps',
+                            'AsianPussy', 'blackpussy', 'latinas', 'milf', 'Amateur',
+                            'pussy', 'vagina', 'nsfw', 'gonewild', 'RealGirls'
+                        ];
+
+                        // MEZCLADOR: Elegimos 10 al azar para esta recarga
+                        const fuentesRandom = fuentesMaestras.sort(() => 0.5 - Math.random()).slice(0, 10).join('+');
+
+                        // Pedimos 60 fotos
+                        const { data } = await axios.get(`https://meme-api.com/gimme/${fuentesRandom}/60`);
+
+                        // 3. FILTRADO (Solo imágenes)
+                        let fotosLimpias = data.memes.filter(meme => {
+                            const ext = meme.url.split('.').pop().toLowerCase();
+                            return (ext === 'jpg' || ext === 'png' || ext === 'jpeg');
+                        });
+
+                        // 4. BARAJAR (SHUFFLE)
+                        for (let i = fotosLimpias.length - 1; i > 0; i--) {
+                            const j = Math.floor(Math.random() * (i + 1));
+                            [fotosLimpias[i], fotosLimpias[j]] = [fotosLimpias[j], fotosLimpias[i]];
+                        }
+
+                        global.cachePussy = fotosLimpias;
+                        console.log(`✅ Cache Pussy recargado: ${global.cachePussy.length} fotos.`);
+                    }
+
+                    // 5. SACAR FOTO
+                    if (global.cachePussy.length === 0) throw new Error("Cache vacío");
+                    const imagen = global.cachePussy.pop(); 
+
+                    // 6. ENVIAR (CON TU TEXTO ORIGINAL)
                     await sock.sendMessage(from, { 
-                        image: { url: backup.data.url }, 
-                        caption: '*😋 TETAS*' 
+                        image: { url: imagen.url }, 
+                        caption: '*😋 VAGINA*' // Texto corregido
+                    }, { quoted: m });
+
+                } catch (e) {
+                    console.log("Error Pussy:", e.message);
+                    // Respaldo
+                    try {
+                        const backup = await axios.get(`https://nekobot.xyz/api/image?type=pussy`);
+                        await sock.sendMessage(from, { 
+                            image: { url: backup.data.message }, 
+                            caption: '*😋 VAGINA*' 
+                        }, { quoted: m });
+                    } catch (e2) {
+                        await sock.sendMessage(from, { text: "❌ Error: Intenta de nuevo." }, { quoted: m });
+                    }
+                }
+            break;
+
+
+
+            // ==========================================
+            // 🎮 COMANDO: PPT (CORREGIDO - NO CRASHEA)
+            // ==========================================
+            case 'ppt': case 'pvp':
+                // 1. Normalizar la elección
+                let userChoice = text.trim().toLowerCase();
+                
+                const validOptions = {
+                    "piedra": "🪨", "roca": "🪨", "🪨": "🪨",
+                    "papel": "📄", "📄": "📄",
+                    "tijera": "✂️", "tijeras": "✂️", "✂️": "✂️"
+                };
+
+                if (!validOptions[userChoice]) {
+                    return sock.sendMessage(from, { 
+                        text: `⚠️ *Modo de uso:*\n\nEscribe *.ppt* seguido de tu elección:\n\n🪨 .ppt piedra\n📄 .ppt papel\n✂️ .ppt tijera` 
                     }, { quoted: m });
                 }
-          break;  }
+
+                const userEmoji = validOptions[userChoice];
+                const choices = ["🪨", "📄", "✂️"];
+                const botEmoji = choices[Math.floor(Math.random() * choices.length)];
+
+                // 2. Lógica del Ganador
+                let resultText = "";
+                
+                if (userEmoji === botEmoji) {
+                    resultText = "🤝 ¡Es un EMPATE!";
+                } else if (
+                    (userEmoji === "🪨" && botEmoji === "✂️") ||
+                    (userEmoji === "📄" && botEmoji === "🪨") ||
+                    (userEmoji === "✂️" && botEmoji === "📄")
+                ) {
+                    resultText = "🏆 ¡TÚ GANAS! (+150 XP)";
+                } else {
+                    resultText = "☠️ ¡YO GANO! (Perdiste honor)";
+                }
+
+                // 3. ANIMACIÓN (Variables con nombre único para no dar error)
+                // Usamos 'keyPPT' en lugar de 'key' para que no choque con el comando .gay
+                let { key: keyPPT } = await sock.sendMessage(from, { text: "🎲 *¡Piedra!* 🪨..." }, { quoted: m });
+                
+                const steps = [
+                    "🎲 *¡Papel!* 📄...",
+                    "🎲 *¡Tijera!* ✂️...",
+                    "💥 *¡SHOOT!*"
+                ];
+
+                for (let step of steps) {
+                    await new Promise(r => setTimeout(r, 600)); 
+                    // Editamos usando la nueva variable única
+                    await sock.sendMessage(from, { text: step, edit: keyPPT });
+                }
+
+                // 4. RESULTADO FINAL
+                await new Promise(r => setTimeout(r, 400)); 
+                
+                const finalMessage = `
+🎮 *PIEDRA, PAPEL O TIJERA* 🎮
+
+👤 Tú: ${userEmoji}
+🤖 Bot: ${botEmoji}
+
+${resultText}
+`;
+                await sock.sendMessage(from, { text: finalMessage, edit: keyPPT });
+            break;
 
 
-               switch (command) { case 'ppt':
-                const usuarioElige = body.slice(5).trim().toLowerCase();
-                const opciones = ["piedra", "papel", "tijera"];
-                if (!opciones.includes(usuarioElige)) return sock.sendMessage(from, { text: '⚠️ Elige: piedra, papel o tijera.' }, { quoted: m });
-                const botElige = opciones[Math.floor(Math.random() * opciones.length)];
-                let resultado = (usuarioElige === botElige) ? "🤝 ¡Empate!" : ((usuarioElige === "piedra" && botElige === "tijera") || (usuarioElige === "papel" && botElige === "piedra") || (usuarioElige === "tijera" && botElige === "papel")) ? "🏆 ¡Tú ganas!" : "😭 ¡Yo gano!";
-                await sock.sendMessage(from, { text: `🤖 Yo: *${botElige}*\n👤 Tú: *${usuarioElige}*\n\n${resultado}` }, { quoted: m });
-           break; }
 
             // ==========================================
-            // 💰 SISTEMA: ECONOMÍA (BANCO)
+            // 🛒 COMANDO: TIENDA / SHOP (LIMPIO Y FUNCIONAL)
             // ==========================================
-            
-            if (!banco[usuarioKey]) banco[usuarioKey] = 0;
+            case 'tienda': case 'shop': { // { <--- Protege las variables
+                // 1. Obtener Saldo Global
+                const usuarioKey = m.key.participant || m.key.remoteJid;
+                // Asegurar base de datos
+                if (!global.banco) global.banco = {};
+                if (!global.banco[usuarioKey]) global.banco[usuarioKey] = 0;
 
+                const saldoActual = global.banco[usuarioKey];
 
-            // ==========================================
-            // 🛒 COMANDO: TIENDA (.shop)
-            // ==========================================
-               switch (command) { case 'tienda': case 'shop':
+                // 2. Reacción
                 await sock.sendMessage(from, { react: { text: "🛍️", key: m.key } });
 
+                // 3. Crear Encabezado
                 let txt = `╭─── 〔 🏪 *MEGA MALL* 〕 ───\n`;
-                txt += `│ Para comprar: *.buy [item]*\n`;
-                txt += `│ Ej: *.buy ferrari*\n│\n`;
+                txt += `│ 👤 *Cliente:* @${usuarioKey.split('@')[0]}\n`;
+                txt += `│ 💰 *Saldo:* $${saldoActual.toLocaleString()}\n`;
+                txt += `│ 🛒 *Uso:* .buy [item] (Ej: .buy ferrari)\n`;
+                txt += `│\n`;
 
-                // Generar lista automáticamente desde el catálogo
+                // 4. Generar lista automática desde 'shopItems'
                 let categorias = {};
+
                 for (let id in shopItems) {
                     let item = shopItems[id];
                     if (!categorias[item.tipo]) categorias[item.tipo] = [];
-                    categorias[item.tipo].push(`│ 🏷️ *${id}* ➔ $${item.precio.toLocaleString()} ${item.emoji}`);
+                    // Formato: 🚗 Ferrari 488 ➔ $250,000 (ID: ferrari)
+                    // Usamos item.nombre para que se vea bonito y 'id' para saber qué comprar
+                    categorias[item.tipo].push(`│ ${item.emoji} *${item.nombre}* \n│    └─ 🏷️ ID: ${id} | 💲 $${item.precio.toLocaleString()}`);
                 }
 
-                txt += `│ 🚗 *VEHÍCULOS:*\n${categorias['coche'].join('\n')}\n│\n`;
-                txt += `│ 🏰 *PROPIEDADES:*\n${categorias['casa'].join('\n')}\n│\n`;
-                txt += `│ ⛏️ *MINERÍA (Dinero Diario):*\n${categorias['mineria'].join('\n')}\n│\n`;
-                txt += `│ 💎 *LUJOS:*\n${categorias['joya'].join('\n')}\n`;
+                // 5. Construir Menú (Solo si hay items en la categoría)
+                if (categorias['coche'])   txt += `🚗 *VEHÍCULOS:*\n${categorias['coche'].join('\n')}\n│\n`;
+                if (categorias['casa'])    txt += `🏰 *PROPIEDADES:*\n${categorias['casa'].join('\n')}\n│\n`;
+                if (categorias['mineria']) txt += `⛏️ *MINERÍA (Ingresos):*\n${categorias['mineria'].join('\n')}\n│\n`;
+                if (categorias['joya'])    txt += `💎 *LUJOS:*\n${categorias['joya'].join('\n')}\n`;
+
                 txt += `╰──────────────────────`;
 
-                await sock.sendMessage(from, { text: txt }, { quoted: m });
-           break; }
+                // 6. Enviar
+                await sock.sendMessage(from, { 
+                    text: txt, 
+                    mentions: [usuarioKey] 
+                }, { quoted: m });
+
+            } break; // } <--- Cierra protección
+
+
 
             // ==========================================
-            // 💳 COMANDO: COMPRAR (.buy)
+            // 🛍️ COMANDO: BUY / COMPRAR (OPTIMIZADO)
             // ==========================================
-               switch (command) { case 'buy': case 'comprar':
-                let itemID = body.split(' ')[1]?.toLowerCase();
-                let userKey = sender.split('@')[0];
+            case 'buy': case 'comprar': { // { <--- Scope seguro
+                // 1. Identificación y Argumentos
+                let userKey = m.key.participant || m.key.remoteJid;
+                let itemID = args[0]?.toLowerCase(); // Detecta lo que escriben después del comando
 
-                if (!itemID || !shopItems[itemID]) {
-                    return sock.sendMessage(from, { text: `⚠️ ¿Qué quieres comprar? Mira la list con *.shop*` }, { quoted: m });
+                // Validación: ¿Escribió algo?
+                if (!itemID) {
+                    return sock.sendMessage(from, { text: `⚠️ ¿Qué quieres comprar?\nMira la lista con *.shop*` }, { quoted: m });
                 }
 
-                let item = shopItems[itemID];
-                let saldo = banco[userKey] || 0;
+                // Validación: ¿Existe el item en el catálogo?
+                let item = shopItems[itemID]; // Busca en la variable global shopItems
+                if (!item) {
+                    return sock.sendMessage(from, { text: `❌ El artículo *"${itemID}"* no existe en la tienda.` }, { quoted: m });
+                }
 
-                // 1. Verificar Dinero
+                // 2. Cargar/Inicializar Datos del Usuario
+                if (!global.banco) global.banco = {};
+                if (!global.banco[userKey]) global.banco[userKey] = 0;
+                if (!global.inventario) global.inventario = {};
+                if (!global.inventario[userKey]) global.inventario[userKey] = [];
+
+                let saldo = global.banco[userKey];
+
+                // 3. Verificar Dinero
                 if (saldo < item.precio) {
-                    return sock.sendMessage(from, { text: `💸 Estás pobre. Te faltan $${(item.precio - saldo).toLocaleString()} para el ${item.nombre}.` }, { quoted: m });
+                    return sock.sendMessage(from, { 
+                        text: `💸 *Estás pobre.*\nTe faltan *$${(item.precio - saldo).toLocaleString()}* para comprar: ${item.nombre}.` 
+                    }, { quoted: m });
                 }
 
-                // 2. Verificar si ya lo tiene (Opcional, pero recomendado para coches/casas)
-                if (!inventario[userKey]) inventario[userKey] = [];
-                if (inventario[userKey].includes(itemID) && item.tipo !== 'joya' && item.tipo !== 'mineria') {
-                    return sock.sendMessage(from, { text: `⚠️ Ya tienes un ${item.nombre} en tu garaje.` }, { quoted: m });
+                // 4. Verificar Duplicados (Lógica inteligente)
+                // Si ya lo tiene Y NO ES (joya ni minería), bloqueamos la compra.
+                // (O sea, solo puedes tener 1 Ferrari, pero infinitas GPUs o Anillos)
+                if (global.inventario[userKey].includes(itemID) && item.tipo !== 'joya' && item.tipo !== 'mineria') {
+                    return sock.sendMessage(from, { text: `⚠️ Ya tienes un *${item.nombre}* en tu propiedad.` }, { quoted: m });
                 }
 
-                // 3. Transacción
-                banco[userKey] -= item.precio;
-                inventario[userKey].push(itemID);
-                
-                guardarJSON(rutaBanco, banco);
-                guardarInventario();
+                // 5. TRANSACCIÓN
+                global.banco[userKey] -= item.precio;      // Restamos dinero
+                global.inventario[userKey].push(itemID);   // Agregamos al inventario
 
-                await sock.sendMessage(from, { text: `✅ *COMPRA EXITOSA*\nHas comprado: ${item.nombre} ${item.emoji}\n💰 Nuevo saldo: $${banco[userKey].toLocaleString()}` }, { quoted: m });
-           break; }
+                // 6. GUARDADO AUTOMÁTICO (Para no perder datos si se apaga)
+                // Usamos las rutas que definimos al principio del archivo
+                guardarJSON(rutaBanco, global.banco);
+                guardarJSON(rutaInventario, global.inventario);
+
+                // 7. Mensaje de Éxito
+                await sock.sendMessage(from, { 
+                    text: `✅ *COMPRA EXITOSA*\n\n📦 Artículo: ${item.emoji} ${item.nombre}\n💰 Nuevo saldo: $${global.banco[userKey].toLocaleString()}` 
+                }, { quoted: m });
+
+            } break; // } <--- Cierre seguro
+
+
 
             // ==========================================
-            // 🎒 COMANDO: INVENTARIO (.inv)
+            // 🎒 COMANDO: INVENTARIO / INV (OPTIMIZADO)
             // ==========================================
-               switch (command) { case 'inv': case 'inventario':
-                let userKey = sender.split('@')[0];
-                let items = inventario[userKey] || [];
+            case 'inv': case 'inventario': { // { <--- Scope seguro
+                // 1. Identificar Usuario
+                const userKey = m.key.participant || m.key.remoteJid;
 
-                if (items.length === 0) return sock.sendMessage(from, { text: "🎒 Tu inventario está vacío. Ve a comprar con .shop" }, { quoted: m });
+                // 2. Cargar Inventario Seguro
+                if (!global.inventario) global.inventario = {};
+                const items = global.inventario[userKey] || [];
 
-                // Contar items repetidos
+                // Si no tiene nada...
+                if (items.length === 0) {
+                    return sock.sendMessage(from, { 
+                        text: "🎒 *Tu inventario está vacío.*\nVe a gastar tu dinero con *.shop*" 
+                    }, { quoted: m });
+                }
+
+                // 3. Lógica de Conteo (Agrupar items repetidos)
+                // Convierte: ['gpu', 'gpu', 'coche']  --->  { gpu: 2, coche: 1 }
                 let conteo = {};
-                items.forEach(i => { conteo[i] = (conteo[i] || 0) + 1; });
+                items.forEach(id => { 
+                    conteo[id] = (conteo[id] || 0) + 1; 
+                });
 
-                let txt = `🎒 *INVENTARIO DE ${pushName}*\n\n`;
+                // 4. Construir Mensaje
+                let txt = `🎒 *INVENTARIO DE @${userKey.split('@')[0]}*\n──────────────────\n`;
+                let valorTotal = 0;
+
                 for (let id in conteo) {
-                    let item = shopItems[id];
-                    txt += `▪️ ${item.emoji} *${item.nombre}* (x${conteo[id]})\n`;
+                    let itemData = shopItems[id]; // Buscamos info en el catálogo global
+
+                    // Solo mostramos si el item existe en la tienda (seguridad)
+                    if (itemData) {
+                        txt += `▪️ ${itemData.emoji} *${itemData.nombre}* (x${conteo[id]})\n`;
+                        // Calculamos el valor acumulado
+                        valorTotal += itemData.precio * conteo[id];
+                    }
                 }
 
-                // Valor total del inventario
-                let valorTotal = items.reduce((acc, curr) => acc + shopItems[curr].precio, 0);
-                txt += `\n💰 *Valor de Activos:* $${valorTotal.toLocaleString()}`;
+                txt += `──────────────────\n`;
+                txt += `💰 *Valor de Activos:* $${valorTotal.toLocaleString()}`;
 
-                await sock.sendMessage(from, { text: txt }, { quoted: m });
-           break; }
+                // 5. Enviar
+                await sock.sendMessage(from, { 
+                    text: txt, 
+                    mentions: [userKey] 
+                }, { quoted: m });
+
+            } break; // } <--- Cierre seguro
+
+
 
             // ==========================================
-            // 🎰 COMANDO: TRAGAMONEDAS (.slot)
+            // 🎰 COMANDO: SLOT / CASINO (ANIMADO ULTRA)
             // ==========================================
-               switch (command) { case 'slot': case 'casino':
-                let userKey = sender.split('@')[0];
-                let args = body.split(' ');
+            case 'slot': case 'casino': case 'apostar': { 
+                // 1. Configuración Inicial
+                const userKey = m.key.participant || m.key.remoteJid;
+                const apuestaStr = args[0]; // Usamos args[0] limpio
+
+                // Ayuda visual
+                if (!apuestaStr) {
+                    return sock.sendMessage(from, { 
+                        text: `🎰 *CASINO ROYALE*\n\n📝 Uso: *.slot [cantidad]*\n🔥 Ej: .slot 1000\n🔥 Ej: .slot all (Todo o nada)` 
+                    }, { quoted: m });
+                }
+
+                // 2. Gestión de Dinero (Global)
+                if (!global.banco) global.banco = {};
+                if (!global.banco[userKey]) global.banco[userKey] = 0;
+
+                let saldo = global.banco[userKey];
+                let apuesta = 0;
+
+                // Lógica para "all" (Apostar todo) o números con k/m
+                if (apuestaStr.toLowerCase() === 'all' || apuestaStr.toLowerCase() === 'todo') {
+                    apuesta = saldo;
+                } else {
+                    apuesta = parseInt(apuestaStr.toLowerCase().replace(/k/g, '000').replace(/m/g, '000000'));
+                }
+
+                // Validaciones
+                if (isNaN(apuesta) || apuesta < 100) return sock.sendMessage(from, { text: "⚠️ La apuesta mínima es de $100." }, { quoted: m });
+                if (saldo < apuesta) return sock.sendMessage(from, { text: `💸 *No tienes fondos.*\nTe faltan: $${(apuesta - saldo).toLocaleString()}` }, { quoted: m });
+
+                // 3. COBRAMOS LA ENTRADA (Importante cobrar antes de girar)
+                global.banco[userKey] -= apuesta;
+
+                // 4. ANIMACIÓN DE GIRO (Suspenso) 🔄
+                // Definimos los emojis (Items)
+                const items = ["🍒", "🍋", "🍇", "🍉", "🔔", "💎", "7️⃣"];
+                // Enviamos el mensaje base y guardamos su ID (keySlot)
+                // Usamos 'keySlot' para que no choque con la variable 'key' de otros comandos
+                let { key: keySlot } = await sock.sendMessage(from, { text: "🎰 | ⬜ | ⬜ | ⬜ | Girando..." }, { quoted: m });
+
+                // Efecto de giro rápido (3 frames)
+                for (let i = 0; i < 3; i++) {
+                    await new Promise(r => setTimeout(r, 300)); // Velocidad de giro
+                    const rAzar = items[Math.floor(Math.random() * items.length)];
+                    await sock.sendMessage(from, { text: `🎰 | ${rAzar} | ${rAzar} | ${rAzar} | 💫`, edit: keySlot });
+                }
+
+                // 5. RESULTADO DEFINITIVO
+                // Calculamos los 3 rodillos finales
+                const r1 = items[Math.floor(Math.random() * items.length)];
+                const r2 = items[Math.floor(Math.random() * items.length)];
+                const r3 = items[Math.floor(Math.random() * items.length)];
+
+                // 6. CÁLCULO DE GANANCIAS
+                let ganancia = 0;
+                let mensajeResultado = "";
+                let estado = "";
+
+                if (r1 === r2 && r2 === r3) {
+                    // --- JACKPOT (3 Iguales) ---
+                    // Si son 7️⃣ o 💎 paga MUCHO MÁS (x10), si no x5
+                    const multiplicador = (r1 === "7️⃣" || r1 === "💎") ? 10 : 5;
+                    ganancia = apuesta * multiplicador;
+                    global.banco[userKey] += ganancia;
+                    estado = "🏆 ¡JACKPOT MÍTICO!";
+                } else if (r1 === r2 || r2 === r3 || r1 === r3) {
+                    // --- PAR (2 Iguales) ---
+                    ganancia = Math.floor(apuesta * 1.5); // Recuperas y ganas la mitad
+                    global.banco[userKey] += ganancia;
+                    estado = "🌟 ¡BUENA JUGADA!";
+                    mensajeResultado = `🤏 Casi... 2 iguales.\n💰 Ganaste: $${ganancia.toLocaleString()}`;
+                } else {
+                    // --- PERDEDOR ---
+                    estado = "📉 PERDISTE";
+                    mensajeResultado = `💸 Se esfumaron $${apuesta.toLocaleString()}`;
+                }
+
+                // Guardamos en la base de datos (seguridad)
+                if (typeof guardarJSON === 'function') guardarJSON(rutaBanco, global.banco);
+
+                // 7. EDICIÓN FINAL (Muestra el resultado)
+                const textoFinal = `
+🎰 *CASINO ROYALE* 🎰
+────────────────
+       │ ${r1} │ ${r2} │ ${r3} │
+────────────────
+${estado}
+${mensajeResultado}
+
+🏦 *Saldo:* $${global.banco[userKey].toLocaleString()}
+`.trim();
+
+                await sock.sendMessage(from, { text: textoFinal, edit: keySlot });
+
+            } break;
+
+
+
+            // ==========================================
+            // 🔴 COMANDO: RULETA / ROULETTE (ANIMADA + NÚMEROS)
+            // ==========================================
+            case 'ruleta': case 'roulette': { 
+                const userKey = m.key.participant || m.key.remoteJid;
+                // 1. Parsear argumentos (Elección y Apuesta)
+                // args[0] = A qué apuestas (rojo, negro, verde, 0-36)
+                // args[1] = Cuánto apuestas
+                let eleccion = args[0]?.toLowerCase(); 
                 let apuestaStr = args[1];
 
-                if (!apuestaStr) return sock.sendMessage(from, { text: `🎰 *CASINO ${ownerData.botName}*\nUso: .slot [cantidad]\nEj: .slot 1000` }, { quoted: m });
+                if (!eleccion || !apuestaStr) {
+                    return sock.sendMessage(from, { 
+                        text: `🔴 *CASINO RULETA*\n\n📝 Uso: *.ruleta [opción] [cantidad]*\n\n📌 *Opciones:*\n🎨 Colores: rojo, negro, verde\n🔢 Números: 0-36 (Paga x36)\n\n🔥 *Ejemplos:*\n.ruleta rojo 500\n.ruleta 7 1000\n.ruleta negro all` 
+                    }, { quoted: m });
+                }
 
-                let apuesta = apuestaStr === 'all' ? banco[userKey] : parseInt(apuestaStr.toLowerCase().replace(/k/g, '000').replace(/m/g, '000000'));
-                
+                // 2. Gestión de Dinero (Global)
+                if (!global.banco) global.banco = {};
+                if (!global.banco[userKey]) global.banco[userKey] = 0;
+
+                let saldo = global.banco[userKey];
+                let apuesta = 0;
+
+                // Soporte "all" y "k/m"
+                if (apuestaStr.toLowerCase() === 'all' || apuestaStr.toLowerCase() === 'todo') {
+                    apuesta = saldo;
+                } else {
+                    apuesta = parseInt(apuestaStr.toLowerCase().replace(/k/g, '000').replace(/m/g, '000000'));
+                }
+
+                // Validaciones
                 if (isNaN(apuesta) || apuesta < 100) return sock.sendMessage(from, { text: "⚠️ Apuesta mínima: $100" }, { quoted: m });
-                if ((banco[userKey] || 0) < apuesta) return sock.sendMessage(from, { text: "💸 No tienes suficiente dinero." }, { quoted: m });
+                if (saldo < apuesta) return sock.sendMessage(from, { text: `💸 *No tienes fondos.*\nTe faltan: $${(apuesta - saldo).toLocaleString()}` }, { quoted: m });
 
-                // Lógica del juego
-                const emojis = ["🍒", "🍋", "🍇", "💎", "🔔", "7️⃣"];
-                let a = emojis[Math.floor(Math.random() * emojis.length)];
-                let b = emojis[Math.floor(Math.random() * emojis.length)];
-                let c = emojis[Math.floor(Math.random() * emojis.length)];
+                // 3. COBRAMOS LA ENTRADA
+                global.banco[userKey] -= apuesta;
 
-                // Animación (Fake delay)
-                await sock.sendMessage(from, { react: { text: "🎰", key: m.key } });
+                // 4. ANIMACIÓN DE GIRO 🔄
+                // Enviamos mensaje inicial
+                let { key: keyRuleta } = await sock.sendMessage(from, { text: "🎲 La bola está girando...\n⚪ ... 🔴 ... ⚫ ... ⚪" }, { quoted: m });
 
-                let resultado = "";
-                let ganancia = 0;
-                let mensajeFinal = "";
+                // Efecto de giro (simula la bola pasando por números)
+                const frames = [
+                    "🎲 Girando...\n🔴 32 ... ⚫ 15 ... 🔴 19",
+                    "🎲 Girando...\n⚫ 4 ... 🔴 21 ... ⚫ 2",
+                    "🎲 Girando...\n🔴 25 ... ⚫ 17 ... 🔴 34",
+                    "🎲 Girando...\n🟢 0 ... 🔴 3 ... ⚫ 26"
+                ];
 
-                // Restamos dinero primero (luego devolvemos si gana)
-                banco[userKey] -= apuesta;
-
-                if (a === b && b === c) {
-                    // JACKPOT (3 iguales) - x4
-                    ganancia = apuesta * 4;
-                    banco[userKey] += ganancia;
-                    resultado = "🌟 ¡JACKPOT! 🌟";
-                    mensajeFinal = `🤑 Ganaste: $${ganancia.toLocaleString()}`;
-                } else if (a === b || b === c || a === c) {
-                    // PAR (2 iguales) - x1.5
-                    ganancia = Math.floor(apuesta * 1.5);
-                    banco[userKey] += ganancia;
-                    resultado = "✨ ¡BUENA JUGADA!";
-                    mensajeFinal = `💰 Ganaste: $${ganancia.toLocaleString()}`;
-                } else {
-                    // PERDEDOR
-                    resultado = "📉 PERDISTE";
-                    mensajeFinal = `💸 Perdiste: $${apuesta.toLocaleString()}`;
+                for (let frame of frames) {
+                    await new Promise(r => setTimeout(r, 500)); // Velocidad
+                    await sock.sendMessage(from, { text: frame, edit: keyRuleta });
                 }
 
-                guardarJSON(rutaBanco, banco);
-
-                let txt = `🎰 *TRAGAMONEDAS* 🎰\n\n`;
-                txt += `      │${a}│${b}│${c}│\n\n`;
-                txt += `${resultado}\n${mensajeFinal}\n🏦 Saldo: $${banco[userKey].toLocaleString()}`;
-
-                await sock.sendMessage(from, { text: txt }, { quoted: m });
-           break; }
-
-            // ==========================================
-            // 🔴 COMANDO: RULETA (.ruleta)
-            // ==========================================
-               switch (command) { case 'ruleta': case 'rulette':
-                let args = body.split(' ');
-                let color = args[1]?.toLowerCase(); // rojo, negro, verde
-                let apuestaStr = args[2];
-
-                if (!color || !apuestaStr || !['rojo', 'negro', 'verde'].includes(color)) {
-                    return sock.sendMessage(from, { text: `🔴 *RULETA EUROPEA*\nUso: .ruleta [color] [cantidad]\nColores: rojo, negro, verde\nEj: .ruleta negro 500` }, { quoted: m });
-                }
-
-                let userKey = sender.split('@')[0];
-                let apuesta = apuestaStr === 'all' ? banco[userKey] : parseInt(apuestaStr.toLowerCase().replace(/k/g, '000').replace(/m/g, '000000'));
-
-                if ((banco[userKey] || 0) < apuesta) return sock.sendMessage(from, { text: "💸 Fondos insuficientes." }, { quoted: m });
-
-                banco[userKey] -= apuesta; // Cobramos entrada
-
-                // Tiramos la bola
-                let random = Math.floor(Math.random() * 37); // 0-36
-                let resultadoColor = (random === 0) ? 'verde' : (random % 2 === 0) ? 'negro' : 'rojo';
-                
-                let ganancia = 0;
-                let win = false;
-
-                // Lógica de pagos
-                if (color === resultadoColor) {
-                    win = true;
-                    if (color === 'verde') ganancia = apuesta * 14; // El verde paga x14
-                    else ganancia = apuesta * 2; // Rojo/Negro paga x2
-                    banco[userKey] += ganancia;
-                }
-
-                guardarJSON(rutaBanco, banco);
-
+                // 5. RESULTADO FINAL
+                await new Promise(r => setTimeout(r, 500)); // Pausa dramática
+                // Generamos el número ganador (0 - 36)
+                let resultadoNum = Math.floor(Math.random() * 37);
+                // Determinamos el color del resultado
+                // 0 = Verde, Pares = Negro, Impares = Rojo (Lógica simple)
+                let resultadoColor = (resultadoNum === 0) ? 'verde' : (resultadoNum % 2 === 0) ? 'negro' : 'rojo';
                 let emojiBola = resultadoColor === 'rojo' ? '🔴' : resultadoColor === 'negro' ? '⚫' : '🟢';
-                
-                let txt = `🎲 *LA BOLA GIRA...* 🎲\n\n`;
-                txt += `Resultado: ${emojiBola} *[ ${random} ${resultadoColor.toUpperCase()} ]*\n`;
-                txt += win ? `🎉 *¡GANASTE!* Recibes: $${ganancia.toLocaleString()}` : `📉 *PERDISTE* todo...`;
-                txt += `\n🏦 Saldo: $${banco[userKey].toLocaleString()}`;
+
+                // 6. CÁLCULO DE GANANCIAS
+                let ganancia = 0;
+                let estado = "📉 PERDISTE";
+                let multiplicador = 0;
+
+                // CASO A: Apostó a un NÚMERO exacto (Ej: .ruleta 7 100)
+                if (!isNaN(eleccion)) {
+                    if (parseInt(eleccion) === resultadoNum) {
+                        multiplicador = 36; // ¡Paga x36!
+                        ganancia = apuesta * multiplicador;
+                        estado = "🏆 ¡PLENO! (Número Exacto)";
+                    }
+                } 
+                // CASO B: Apostó a un COLOR (Ej: .ruleta rojo 100)
+                else {
+                    if (eleccion === resultadoColor) {
+                        if (eleccion === 'verde') {
+                            multiplicador = 15; // Verde paga x15
+                            estado = "🍀 ¡VERDE DE LA SUERTE!";
+                        } else {
+                            multiplicador = 2; // Rojo/Negro paga x2
+                            estado = "✅ ¡GANASTE!";
+                        }
+                        ganancia = apuesta * multiplicador;
+                    }
+                }
+
+                // 7. PAGAR Y GUARDAR
+                if (ganancia > 0) {
+                    global.banco[userKey] += ganancia;
+                }
+                // Aseguramos guardado
+                if (typeof guardarJSON === 'function') guardarJSON(rutaBanco, global.banco);
+
+                // 8. MENSAJE FINAL
+                let txt = `🔴 *RULETA CASINO* ⚫\n────────────────\n`;
+                txt += `📢 Resultado: ${emojiBola} *[ ${resultadoNum} ${resultadoColor.toUpperCase()} ]*\n`;
+                txt += `────────────────\n`;
+                txt += `${estado}\n`;
+                if (ganancia > 0) {
+                    txt += `💰 Ganaste: $${ganancia.toLocaleString()}\n(Multiplicador x${multiplicador})`;
+                } else {
+                    txt += `💸 Perdiste: $${apuesta.toLocaleString()}`;
+                }
+                txt += `\n\n🏦 *Saldo:* $${global.banco[userKey].toLocaleString()}`;
+
+                await sock.sendMessage(from, { text: txt, edit: keyRuleta });
+
+            } break;
+
+
+
+            // ==========================================
+            // 🔫 COMANDO: ROBAR / ROB (CRIMEN)
+            // ==========================================
+            case 'robar': case 'rob': case 'crimen': { 
+                const userKey = m.key.participant || m.key.remoteJid;
+                // 1. Validar Víctima
+                // Detecta mención (@) o respuesta a un mensaje
+                let target = m.message.extendedTextMessage?.contextInfo?.mentionedJid?.[0] || 
+                             m.message.extendedTextMessage?.contextInfo?.participant;
+
+                if (!target) return sock.sendMessage(from, { text: "🔫 *Debes etiquetar a tu víctima o responder su mensaje.*" }, { quoted: m });
+                // No robarse a sí mismo ni al bot
+                if (target === userKey) return sock.sendMessage(from, { text: "⚠️ No puedes robarte a ti mismo, genio." }, { quoted: m });
+                if (target.includes(sock.user.id.split(':')[0])) return sock.sendMessage(from, { text: "🛡️ ¡Soy la policía! No puedes robarme." }, { quoted: m });
+
+                // 2. Inicializar Cooldowns (Tiempos de espera)
+                if (!global.cooldowns) global.cooldowns = {};
+                if (!global.cooldowns[userKey]) global.cooldowns[userKey] = {};
+
+                // Tiempo de espera: 15 Minutos
+                let tiempoEspera = 15 * 60 * 1000; 
+                let ultimoRobo = global.cooldowns[userKey].rob || 0;
+                let ahora = Date.now();
+
+                if (ahora - ultimoRobo < tiempoEspera) {
+                    let restante = msToTime(tiempoEspera - (ahora - ultimoRobo));
+                    return sock.sendMessage(from, { text: `🚓 *La policía te está buscando.*\nEscóndete y vuelve a intentarlo en: *${restante}*` }, { quoted: m });
+                }
+
+                // 3. Inicializar Bancos
+                if (!global.banco) global.banco = {};
+                if (!global.banco[userKey]) global.banco[userKey] = 0;
+                if (!global.banco[target]) global.banco[target] = 0;
+
+                let dineroVictima = global.banco[target];
+                let dineroLadron = global.banco[userKey];
+
+                // Regla: La víctima debe tener algo que valga la pena (mínimo $1000)
+                if (dineroVictima < 1000) {
+                    return sock.sendMessage(from, { text: `🐀 @${target.split('@')[0]} es demasiado pobre (menos de $1000).\nNo vale la pena el riesgo.`, mentions: [target] }, { quoted: m });
+                }
+
+                // Regla opcional: El ladrón necesita dinero para la fianza ($500 mínimo)
+                // if (dineroLadron < 500) return sock.sendMessage(from, { text: "⚠️ Necesitas mínimo $500 para sobornos o fianza." }, { quoted: m });
+
+                // 4. EL ATRACO (Probabilidad 40% Éxito)
+                // Math.random() da un número entre 0 y 1. Si es menor a 0.4, ganas.
+                let esExito = Math.random() < 0.4; 
+
+                if (esExito) {
+                    // --- ÉXITO ---
+                    // Robas entre el 10% y el 30% de su dinero
+                    let porcentaje = (Math.random() * (0.30 - 0.10) + 0.10);
+                    let botin = Math.floor(dineroVictima * porcentaje);
+
+                    global.banco[target] -= botin;
+                    global.banco[userKey] += botin;
+
+                    await sock.sendMessage(from, { 
+                        text: `🔫 *¡ATRACO EXITOSO!* 💰\n\nLe has robado *$${botin.toLocaleString()}* a @${target.split('@')[0]}.\n¡Corre antes de que llame a la policía!`, 
+                        mentions: [target] 
+                    }, { quoted: m });
+
+                } else {
+                    // --- FRACASO ---
+                    // La multa es entre $1000 y $5000
+                    let multa = Math.floor(Math.random() * 4000) + 1000;
+                    global.banco[userKey] -= multa;
+
+                    await sock.sendMessage(from, { 
+                        text: `🚓 *¡TE ATRAPARON!* 🚔\n\nLa policía te detuvo y tuviste que pagar una fianza de *$${multa.toLocaleString()}*.\n(Ahora tu saldo es: $${global.banco[userKey].toLocaleString()})` 
+                    }, { quoted: m });
+                }
+
+                // 5. Guardar Cooldown y Datos
+                global.cooldowns[userKey].rob = ahora;
+                // Usamos la función genérica guardarJSON que definimos antes
+                if (typeof guardarJSON === 'function') {
+                    guardarJSON(rutaBanco, global.banco);
+                    guardarJSON(rutaCooldowns, global.cooldowns);
+                }
+
+            } break;
+
+
+
+            // ==========================================
+            // ⛏️ COMANDO: MINAR / MINE (CRYPTO FARM)
+            // ==========================================
+            case 'mine': case 'minar': { 
+                const userKey = m.key.participant || m.key.remoteJid;
+
+                // 1. Cargar Inventario Global
+                if (!global.inventario) global.inventario = {};
+                let misItems = global.inventario[userKey] || [];
+
+                // 2. Calcular Poder de Minado
+                // Aquí definimos cuánto paga cada máquina por hora
+                let gananciaTotal = 0;
+                let maquinas = 0;
+
+                // Recorremos el inventario del usuario
+                misItems.forEach(id => {
+                    // Verificamos si el item existe en la tienda y es de tipo 'mineria'
+                    if (shopItems[id] && shopItems[id].tipo === 'mineria') {
+                        maquinas++;
+                        // TABLA DE GANANCIAS (Ajusta los números si quieres)
+                        if (id === 'gpu')  gananciaTotal += 1500;   // GPU paga $1,500
+                        if (id === 'asic') gananciaTotal += 8000;   // ASIC paga $8,000
+                        if (id === 'farm') gananciaTotal += 85000;  // Granja paga $85,000
+                    }
+                });
+
+                // Si no tiene máquinas...
+                if (gananciaTotal === 0) {
+                    return sock.sendMessage(from, { 
+                        text: "⛏️ *No tienes equipos de minería.*\nVe a la tienda con *.shop* y compra una GPU o una Granja para empezar a ganar dinero." 
+                    }, { quoted: m });
+                }
+
+                // 3. Verificar Cooldown (1 Hora)
+                if (!global.cooldowns) global.cooldowns = {};
+                if (!global.cooldowns[userKey]) global.cooldowns[userKey] = {};
+
+                let ultimoMinado = global.cooldowns[userKey].mine || 0;
+                let ahora = Date.now();
+                let tiempoEspera = 60 * 60 * 1000; // 1 Hora en milisegundos
+
+                if (ahora - ultimoMinado < tiempoEspera) {
+                    // Función simple para formatear tiempo restante
+                    let restante = tiempoEspera - (ahora - ultimoMinado);
+                    let minutos = Math.floor((restante / (1000 * 60)) % 60);
+                    let segundos = Math.floor((restante / 1000) % 60);
+                    return sock.sendMessage(from, { 
+                        text: `🔋 *Equipos Recargando...*\nVuelve en: *${minutos}m ${segundos}s*` 
+                    }, { quoted: m });
+                }
+
+                // 4. ANIMACIÓN DE TRABAJO (Opcional, le da realismo)
+                await sock.sendMessage(from, { react: { text: "⚡", key: m.key } });
+
+                // 5. PAGAR Y GUARDAR
+                if (!global.banco) global.banco = {};
+                if (!global.banco[userKey]) global.banco[userKey] = 0;
+
+                global.banco[userKey] += gananciaTotal;
+                // Actualizar tiempo
+                global.cooldowns[userKey].mine = ahora;
+
+                // Guardar en archivos
+                if (typeof guardarJSON === 'function') {
+                    guardarJSON(rutaBanco, global.banco);
+                    // guardarJSON(rutaCooldowns, global.cooldowns); // Descomenta si usas archivo de cooldowns
+                }
+
+                // 6. REPORTE FINAL
+                let txt = `🔌 *MINERÍA FINALIZADA* 🔌\n────────────────\n`;
+                txt += `💻 Máquinas activas: *${maquinas}*\n`;
+                txt += `💸 Ganancia generada: *$${gananciaTotal.toLocaleString()}*\n`;
+                txt += `────────────────\n`;
+                txt += `🏦 *Nuevo Saldo:* $${global.banco[userKey].toLocaleString()}`;
 
                 await sock.sendMessage(from, { text: txt }, { quoted: m });
-           break; }
+
+            } break;
+
+
 
             // ==========================================
-            // 🔫 COMANDO: ROBAR (.rob)
+            // 👤 COMANDO: PERFIL (PRO + IMAGEN FIJA)
             // ==========================================
-                switch (command) { case 'robar': case 'rob':
-                let userKey = sender.split('@')[0];
-                let target = m.message.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
+            case 'perfil': case 'profile': case 'nivel': { 
+                // 1. Reacción Estética
+                await sock.sendMessage(from, { react: { text: "💳", key: m.key } });
+
+                // 2. Datos Globales
+                const userKey = m.key.participant || m.key.remoteJid;
                 
-                if (!target) return sock.sendMessage(from, { text: "🔫 Etiqueta a tu víctima." }, { quoted: m });
-                let targetKey = target.split('@')[0];
+                // Asegurar que existan los datos
+                if (!global.banco) global.banco = {};
+                if (!global.titulos) global.titulos = {};
 
-                if (userKey === targetKey) return sock.sendMessage(from, { text: "No te puedes robar a ti mismo." });
+                let saldo = global.banco[userKey] || 0;
+                
+                // 3. DEFINICIÓN DE RANGOS (NIVELES)
+                const roles = [
+                    { limit: 0, role: "Vagabundo 🏚️" },
+                    { limit: 500, role: "Mendigo 🪣" },
+                    { limit: 1000, role: "Aprendiz 🔨" },
+                    { limit: 5000, role: "Empleado 💼" },
+                    { limit: 10000, role: "Supervisor 🧐" },
+                    { limit: 25000, role: "Gerente 👔" },
+                    { limit: 50000, role: "Director 🥂" },
+                    { limit: 100000, role: "Empresario 📈" },
+                    { limit: 500000, role: "Lobo de WallSt 🐺" },
+                    { limit: 1000000, role: "Millonario 💰" },
+                    { limit: 10000000, role: "Magnate 💎" },
+                    { limit: 100000000, role: "Billonario 🏦" },
+                    { limit: 1000000000, role: "Elon Musk 🚀" },
+                    { limit: 10000000000, role: "Dios Griego ⚡" }
+                ];
 
-                // Cooldown de crimen (15 minutos)
-                let time = cooldowns[userKey]?.rob || 0;
-                let now = Date.now();
-                if (now - time < 15 * 60 * 1000) {
-                    return sock.sendMessage(from, { text: `🚓 La policía te está buscando. Escóndete ${msToTime(15 * 60 * 1000 - (now - time))}.` }, { quoted: m });
+                // 4. CÁLCULO DE RANGO ACTUAL
+                let role = roles[0].role;
+                let nextRole = roles[1];
+                let tituloPersonalizado = global.titulos[userKey] || null;
+
+                for (let i = 0; i < roles.length; i++) {
+                    if (saldo >= roles[i].limit) {
+                        role = roles[i].role;
+                        if (i + 1 < roles.length) {
+                            nextRole = roles[i + 1];
+                        } else {
+                            nextRole = null; 
+                        }
+                    }
                 }
 
-                let dineroVictima = banco[targetKey] || 0;
-                if (dineroVictima < 1000) return sock.sendMessage(from, { text: "🐀 Esa víctima es muy pobre, no vale la pena." });
-
-                // Probabilidad 30% éxito
-                let exito = Math.random() < 0.3;
-
-                if (exito) {
-                    let robado = Math.floor(dineroVictima * 0.2); // Robas 20%
-                    banco[targetKey] -= robado;
-                    banco[userKey] = (banco[userKey] || 0) + robado;
-                    await sock.sendMessage(from, { text: `🔫 *¡ATRACO EXITOSO!*\nLe robaste $${robado.toLocaleString()} a @${targetKey}. Corre!`, mentions: [target] });
+                // 5. BARRA DE PROGRESO
+                let barra = ""; // Agregado 'let' para evitar errores
+                let falta = 0;
+                
+                if (nextRole) {
+                    let porcentaje = Math.floor((saldo / nextRole.limit) * 100);
+                    if (porcentaje > 100) porcentaje = 100;
+                    
+                    // Dibujo de la barra (10 bloques)
+                    let bloquesLlenos = Math.floor(porcentaje / 10);
+                    let bloquesVacios = 10 - bloquesLlenos;
+                    barra = "█".repeat(bloquesLlenos) + "░".repeat(bloquesVacios) + ` ${porcentaje}%`;
+                    
+                    falta = nextRole.limit - saldo;
                 } else {
-                    let multa = 5000;
-                    banco[userKey] = Math.max(0, (banco[userKey] || 0) - multa);
-                    await sock.sendMessage(from, { text: `🚓 *¡TE ATRAPARON!*\nLa policía te dio una paliza y pagaste $${multa} de fianza.` });
+                    barra = "██████████ Nivel Máximo";
                 }
 
-                cooldowns[userKey] = { ...cooldowns[userKey], rob: now };
-                guardarJSON(rutaBanco, banco);
-                guardarCooldowns();
-           break; }
+                // 6. IMAGEN SOLICITADA (FIJA)
+                const imagenPerfil = "https://files.catbox.moe/vnadnu.jpg";
 
-            // ==========================================
-            // ⛏️ COMANDO: MINAR (.mine) - Requiere GPU
-            // ==========================================
-               switch (command) { case 'mine': case 'minar':
-                let userKey = sender.split('@')[0];
-                let misItems = inventario[userKey] || [];
+                // 7. DISEÑO DEL MENSAJE
+                let txt = `╭─── 〔 💳 *TARJETA VIP* 〕 ───\n`;
+                txt += `│ 👤 *Usuario:* ${pushName}\n`;
+                txt += `│ 🆔 *Tag:* @${userKey.split('@')[0]}\n`;
+                txt += `│\n`;
+                txt += `│ 💰 *Patrimonio:* $${saldo.toLocaleString()}\n`;
+                txt += `│ 🏆 *Rango:* ${tituloPersonalizado || role}\n`;
+                txt += `│\n`;
+                txt += `│ 📊 *Progreso:* \n│ ${barra}\n`;
                 
-                // Buscar la mejor GPU que tenga el usuario
-                let poderMinado = 0;
-                misItems.forEach(id => {
-                    if (shopItems[id].tipo === 'mineria') poderMinado += shopItems[id].rate;
-                });
+                if (nextRole) {
+                    txt += `│ 🎯 *Siguiente:* ${nextRole.role}\n`;
+                    txt += `│ 💸 *Falta:* $${falta.toLocaleString()}\n`;
+                } else {
+                    txt += `│ 👑 *¡Cima del éxito!*\n`;
+                }
+                
+                txt += `│\n`;
+                txt += `│ 🤖 *Bot:* ${ownerData.botName}\n`;
+                txt += `╰──────────────────────`;
 
-                if (poderMinado === 0) return sock.sendMessage(from, { text: "⛏️ No tienes equipos de minería. Compra una GPU en la *.shop*" }, { quoted: m });
+                await sock.sendMessage(from, { 
+                    image: { url: imagenPerfil }, 
+                    caption: txt, 
+                    mentions: [userKey] 
+                }, { quoted: m });
 
-                // Cooldown 1 hora
-                let time = cooldowns[userKey]?.mine || 0;
-                let now = Date.now();
-                if (now - time < 60 * 60 * 1000) {
-                    return sock.sendMessage(from, { text: `🔋 Recargando equipos. Vuelve en ${msToTime(60 * 60 * 1000 - (now - time))}.` }, { quoted: m });
+            } break; // <--- Cierre seguro
+
+
+
+            // ==========================================
+            // ☢️ COMANDO: REINICIAR ECONOMÍA (RESET TOTAL)
+            // ==========================================
+            case 'reseteco': case 'reseteconomia': { 
+                // 1. Verificar si es el Dueño (Seguridad Extrema)
+                if (!esOwner) {
+                    return sock.sendMessage(from, { text: '⛔ *ACCESO DENEGADO*\nSolo mi Creador puede reiniciar la economía.' }, { quoted: m });
                 }
 
-                // Ganancia basada en tus máquinas
-                banco[userKey] = (banco[userKey] || 0) + poderMinado;
-                
-                cooldowns[userKey] = { ...cooldowns[userKey], mine: now };
-                guardarJSON(rutaBanco, banco);
-                guardarCooldowns();
+                // 2. Vaciamos las variables GLOBALES en memoria
+                global.banco = {};
+                global.inventario = {}; // ¡Importante borrar los items también!
+                global.cooldowns = {}; 
+                // global.titulos = {}; // Descomenta si también quieres borrar los rangos personalizados
 
-                await sock.sendMessage(from, { text: `🔌 *MINERÍA CRYPTO*\nTus máquinas generaron: 💰 $${poderMinado.toLocaleString()}` }, { quoted: m });
-           break;
+                // 3. Guardamos los archivos vacíos para que sea permanente
+                // Usamos try-catch por si acaso falla la escritura
+                try {
+                    fs.writeFileSync('./banco.json', JSON.stringify({}));
+                    fs.writeFileSync('./inventario.json', JSON.stringify({}));
+                    fs.writeFileSync('./cooldowns.json', JSON.stringify({}));
+                    // fs.writeFileSync('./titulos.json', JSON.stringify({}));
 
+                    // 4. Mensaje de Confirmación
+                    await sock.sendMessage(from, { 
+                        text: `☢️ *¡ECONOMÍA REINICIADA!* ☢️\n\n🗑️ Se ha eliminado:\n- Todo el dinero\n- Todos los inventarios\n- Todos los tiempos de espera\n\n🤖 *Sistema:* ${ownerData.botName}` 
+                    }, { quoted: m });
 
+                } catch (e) {
+                    console.log(e);
+                    await sock.sendMessage(from, { text: '❌ Error al intentar borrar los archivos de la base de datos.' }, { quoted: m });
+                }
 
-// ==========================================
-// 👤 COMANDO: PERFIL PRO (SOLUCIÓN DEFINITIVA)
-// ==========================================
- case 'perfil':
-    await sock.sendMessage(from, { react: { text: "💳", key: m.key } });
-
-     saldo = banco[userKey] || 0;
-    
-    // 1. DEFINICIÓN DE RANGOS (NIVELES)
-    const roles = [
-        { limit: 0, role: "Vagabundo 🏚️" },
-        { limit: 500, role: "Mendigo 🪣" },
-        { limit: 1000, role: "Aprendiz 🔨" },
-        { limit: 5000, role: "Empleado 💼" },
-        { limit: 10000, role: "Supervisor 🧐" },
-        { limit: 25000, role: "Gerente 👔" },
-        { limit: 50000, role: "Director 🥂" },
-        { limit: 100000, role: "Empresario 📈" },
-        { limit: 500000, role: "Lobo de WallSt 🐺" },
-        { limit: 1000000, role: "Millonario 💰" },
-        { limit: 10000000, role: "Magnate 💎" },
-        { limit: 100000000, role: "Billonario 🏦" },
-        { limit: 1000000000, role: "Elon Musk 🚀" },
-        { limit: 10000000000, role: "Dios Griego ⚡" }
-    ];
-
-    // 2. CÁLCULO DE RANGO ACTUAL
-    let role = roles[0].role;
-    let nextRole = roles[1];
-    let tituloPersonalizado = typeof titulos !== 'undefined' ? titulos[userKey] : null;
-
-    for (let i = 0; i < roles.length; i++) {
-        if (saldo >= roles[i].limit) {
-            role = roles[i].role;
-            if (i + 1 < roles.length) {
-                nextRole = roles[i + 1];
-            } else {
-                nextRole = null; 
-            }
-        }
-    }
-
-    // 3. BARRA DE PROGRESO
-    let barra = "";
-    let falta = 0;
-    if (nextRole) {
-        let porcentaje = Math.floor((saldo / nextRole.limit) * 100);
-        if (porcentaje > 100) porcentaje = 100;
-        let bloquesLlenos = Math.floor(porcentaje / 10);
-        let bloquesVacios = 10 - bloquesLlenos;
-        barra = "█".repeat(bloquesLlenos) + "░".repeat(bloquesVacios) + ` ${porcentaje}%`;
-        falta = nextRole.limit - saldo;
-    } else {
-        barra = "██████████ Nivel Máximo";
-    }
-
-    // 4. FOTO DE PERFIL BLINDADA (ESTO ARREGLA TU ERROR)
-    let ppUrl;
-    try {
-        // Intenta sacar tu foto real
-        ppUrl = await sock.profilePictureUrl(sender, 'image');
-    } catch (e) {
-        // Si falla, genera una imagen única con TUS iniciales y color aleatorio
-        // Esto NUNCA da error 404 porque la crea al momento
-        ppUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(pushName)}&background=random&size=500&color=fff`;
-    }
-
-    // 5. DISEÑO DEL MENSAJE
-    let txt = `╭─── 〔 💳 *TARJETA VIP* 〕 ───\n`;
-    txt += `│ 👤 *Usuario:* ${pushName}\n`;
-    txt += `│ 🆔 *Tag:* @${userKey}\n`;
-    txt += `│\n`;
-    txt += `│ 💰 *Patrimonio:* $${saldo.toLocaleString()}\n`;
-    txt += `│ 🏆 *Rango:* ${tituloPersonalizado || role}\n`;
-    txt += `│\n`;
-    txt += `│ 📊 *Progreso:* \n│ ${barra}\n`;
-    
-    if (nextRole) {
-        txt += `│ 🎯 *Siguiente:* ${nextRole.role}\n`;
-        txt += `│ 💸 *Falta:* $${falta.toLocaleString()}\n`;
-    } else {
-        txt += `│ 👑 *¡Cima del éxito!*\n`;
-    }
-    
-    txt += `│\n`;
-    txt += `│ 🤖 *Bot:* ${ownerData.botName}\n`;
-    txt += `╰──────────────────────`;
-
-    await sock.sendMessage(from, { 
-        image: { url: ppUrl }, 
-        caption: txt, 
-        mentions: [sender] 
-    }, { quoted: m });
-break; }
-
-
-// ==========================================
-// ☢️ COMANDO: REINICIAR ECONOMÍA (RESET TOTAL)
-// ==========================================
-   switch (command) { case 'reseteco': case 'reseteconomia':
-    if (!esOwner) return sock.sendMessage(from, { text: '⛔ ¡ALTO! Solo el Creador puede reiniciar la economía.' }, { quoted: m });
-
-    // 1. Vaciamos las variables en memoria
-    banco = {};
-    cooldowns = {}; 
-    // titulos = {}; // Descomenta si también quieres borrar los rangos
-
-    // 2. Guardamos los archivos vacíos para que sea permanente
-    fs.writeFileSync('./banco.json', JSON.stringify({}));
-    fs.writeFileSync('./cooldowns.json', JSON.stringify({}));
-    // fs.writeFileSync('./titulos.json', JSON.stringify({}));
-
-    await sock.sendMessage(from, { 
-        text: `☢️ *¡ECONOMÍA REINICIADA!* ☢️\n\nTodos los usuarios, dinero y tiempos han sido eliminados de la base de datos.\n\n🤖 *Sistema:* ${ownerData.botName}` 
-    }, { quoted: m });
-break; }
+            } break;
 
 
 
             // ==========================================
-            // 🏆 COMANDO: BALTOP (RANKING MUNDIAL)
+            // 🏆 COMANDO: BALTOP / RANKING (TOP 10 RICOS)
             // ==========================================
-               switch (command) { case 'baltop':
-                // Ordenamos la base de datos de mayor a menor
-                let sorted = Object.entries(banco).sort((a, b) => b[1] - a[1]);
-                let top = sorted.slice(0, 10); // Tomamos solo los 10 mejores
+            case 'baltop': case 'ranking': case 'top': { 
+                // 1. Obtener Base de Datos Global
+                if (!global.banco) global.banco = {};
 
-                let txt = `🏆 *TOP 10 MULTIMILLONARIOS* 🏆\n\n`;
-                
-                // Generamos la lista
-                top.forEach((user, index) => {
-                    let medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
-                    txt += `${medal} @${user[0]}\n   └── 💰 $${user[1].toLocaleString()}\n`;
+                // 2. Ordenar de Mayor a Menor (Ricos primero)
+                // Convertimos el objeto { usuario: dinero } a un array [[usuario, dinero], ...]
+                let sorted = Object.entries(global.banco).sort((a, b) => b[1] - a[1]);
+
+                // Filtramos usuarios con dinero > 0 para no llenar la lista de pobres
+                let ricos = sorted.filter(user => user[1] > 0);
+                // Tomamos solo los 10 mejores
+                let top10 = ricos.slice(0, 10); 
+
+                if (top10.length === 0) {
+                    return sock.sendMessage(from, { text: "📉 *Nadie tiene dinero aún.*\nSé el primero trabajando con *.work*" }, { quoted: m });
+                }
+
+                // 3. Construir la Lista
+                let txt = `🏆 *TOP 10 MULTIMILLONARIOS* 🏆\n──────────────────\n`;
+                let menciones = [];
+
+                top10.forEach((user, index) => {
+                    let medal = "";
+                    if (index === 0) medal = "🥇";
+                    else if (index === 1) medal = "🥈";
+                    else if (index === 2) medal = "🥉";
+                    else medal = `${index + 1}.`;
+
+                    // user[0] es el ID (numero), user[1] es el dinero
+                    txt += `${medal} @${user[0]}\n   └─ 💰 $${user[1].toLocaleString()}\n`;
+                    // Guardamos la ID para que WhatsApp lo etiquete (azul)
+                    menciones.push(user[0] + '@s.whatsapp.net');
                 });
 
-                txt += `\n> 🤖 *${ownerData.botName} Economy System*`;
-                
-                // Mencionamos a los usuarios para que el link funcione
-                let mentions = top.map(u => u[0] + '@s.whatsapp.net');
-                await sock.sendMessage(from, { text: txt, mentions: mentions }, { quoted: m });
-           break; }
+                txt += `──────────────────\n`;
+                txt += `🤖 *${ownerData.botName} Economy System*`;
+                // 4. Enviar con Menciones Reales
+                await sock.sendMessage(from, { 
+                    text: txt, 
+                    mentions: menciones 
+                }, { quoted: m });
+
+            } break;
+
 
             // ==========================================
-            // 📅 COMANDO: DAILY (RECOMPENSA DIARIA)
+            // 📅 COMANDO: DAILY / DIARIO (5000 - 10000)
             // ==========================================
-               switch (command) { case 'diario':
-                let userKey = sender.split('@')[0];
-                let time = cooldowns[userKey]?.daily || 0;
+            case 'diario': case 'daily': { 
+                const userKey = m.key.participant || m.key.remoteJid;
+
+                // 1. Inicializar Cooldowns Globales
+                if (!global.cooldowns) global.cooldowns = {};
+                if (!global.cooldowns[userKey]) global.cooldowns[userKey] = {};
+
+                let time = global.cooldowns[userKey].daily || 0;
                 let now = Date.now();
-                let cooldown = 24 * 60 * 60 * 1000; // 24 Horas
+                let cooldown = 24 * 60 * 60 * 1000; // 24 Horas exactas
 
+                // 2. Verificar si ya lo reclamó
                 if (now - time < cooldown) {
                     let restante = msToTime(cooldown - (now - time));
-                    return sock.sendMessage(from, { text: `⏱️ Vuelve en *${restante}* para reclamar tu diario.` }, { quoted: m });
+                    return sock.sendMessage(from, { 
+                        text: `⏱️ *¡Ya reclamaste tu diario!*\nVuelve en: *${restante}*` 
+                    }, { quoted: m });
                 }
 
-                // Premio aleatorio entre 500 y 2000
-                let premio = Math.floor(Math.random() * 15000) + 5000;
-                
-                banco[userKey] = (banco[userKey] || 0) + premio;
-                guardarJSON(rutaBanco, banco);
-                
-                // Actualizamos cooldown
-                cooldowns[userKey] = { ...cooldowns[userKey], daily: now };
-                guardarCooldowns();
+                // 3. Calcular Premio (Entre 5000 y 10000)
+                // Math.random() * 5001 da un número entre 0 y 5000.
+                // Le sumamos 5000 base. Resultado final: 5000 a 10000.
+                let premio = Math.floor(Math.random() * 5001) + 5000;
+                // 4. Entregar Dinero
+                if (!global.banco) global.banco = {};
+                if (!global.banco[userKey]) global.banco[userKey] = 0;
 
-                await sock.sendMessage(from, { text: `🎁 *RECOMPENSA DIARIA*\nHas recibido: 💰 $${premio}` }, { quoted: m });
-           break; }
+                global.banco[userKey] += premio;
+                // 5. Guardar Cooldown y Datos
+                global.cooldowns[userKey].daily = now;
+
+                if (typeof guardarJSON === 'function') {
+                    guardarJSON(rutaBanco, global.banco);
+                    // guardarJSON(rutaCooldowns, global.cooldowns); // Descomenta si usas archivo cooldowns
+                }
+
+                // 6. Mensaje de Éxito
+                await sock.sendMessage(from, { 
+                    text: `🎁 *RECOMPENSA DIARIA*\n\nHas recibido: 💰 *$${premio.toLocaleString()}*\n\n🏦 *Nuevo Saldo:* $${global.banco[userKey].toLocaleString()}` 
+                }, { quoted: m });
+
+            } break;
+
+
 
             // ==========================================
-            // ⛏️ COMANDO: WORK (TRABAJAR)
+            // 🔨 COMANDO: WORK / TRABAJAR (SUELDO MEJORADO)
             // ==========================================
-                switch (command) { case 'work': case 'trabajar':
-                let userKey = sender.split('@')[0];
-                let time = cooldowns[userKey]?.work || 0;
+            case 'work': case 'trabajar': case 'chambear': { 
+                const userKey = m.key.participant || m.key.remoteJid;
+
+                // 1. Inicializar Globales
+                if (!global.cooldowns) global.cooldowns = {};
+                if (!global.cooldowns[userKey]) global.cooldowns[userKey] = {};
+
+                let time = global.cooldowns[userKey].work || 0;
                 let now = Date.now();
                 let cooldown = 30 * 60 * 1000; // 30 Minutos
 
+                // 2. Verificar Cansancio (Cooldown)
                 if (now - time < cooldown) {
                     let restante = msToTime(cooldown - (now - time));
-                    return sock.sendMessage(from, { text: `😓 Estás cansado. Descansa *${restante}*.` }, { quoted: m });
+                    return sock.sendMessage(from, { 
+                        text: `😓 *Estás agotado.*\nDescansa un poco y vuelve a chambear en: *${restante}*` 
+                    }, { quoted: m });
                 }
 
-                // Trabajos aleatorios
+                // 3. Lista de Trabajos (Más variedad)
                 let trabajos = [
-                    "Ayudaste a una anciana a cruzar y te dio", 
-                    "Trabajaste en McDonald's y ganaste", 
-                    "Vendiste limonada y ganaste", 
-                    "Hackeaste un cajero (con suerte) y sacaste",
-                    "Reparaste el bot y cobraste"
+                    { texto: "Ayudaste a una anciana a cruzar y te dio", emoji: "👵" },
+                    { texto: "Trabajaste en McDonald's y ganaste", emoji: "🍔" },
+                    { texto: "Vendiste limonada en la esquina y sacaste", emoji: "🍋" },
+                    { texto: "Hackeaste un cajero (con suerte) y robaste", emoji: "💻" },
+                    { texto: "Reparaste el servidor del bot y cobraste", emoji: "🤖" },
+                    { texto: "Fuiste albañil por un día y te pagaron", emoji: "🧱" },
+                    { texto: "Hiciste de Uber y ganaste", emoji: "🚗" },
+                    { texto: "Vendiste fotos de tus pies (sin juzgar) y ganaste", emoji: "🦶" }
                 ];
-                let trabajo = trabajos[Math.floor(Math.random() * trabajos.length)];
-                let sueldo = Math.floor(Math.random() * 8000) + 3000;
 
-                banco[userKey] = (banco[userKey] || 0) + sueldo;
-                guardarJSON(rutaBanco, banco);
-                
-                cooldowns[userKey] = { ...cooldowns[userKey], work: now };
-                guardarCooldowns();
+                let chamba = trabajos[Math.floor(Math.random() * trabajos.length)];
 
-                await sock.sendMessage(from, { text: `🔨 ${trabajo}: 💰 $${sueldo}` }, { quoted: m });
-           break; }
+                // 4. Calcular Sueldo (AUMENTADO: Entre 6,000 y 20,000)
+                // Math.random() * 14001 da 0 a 14000. + 6000 base = 6000 a 20000.
+                let sueldo = Math.floor(Math.random() * 14001) + 6000;
 
-            // ==========================================
-            // 💸 COMANDO: TRANSFER (TRANSFERENCIAS)
-            // ==========================================
-               switch (command) { case 'pay': case 'transferir':
-                let args = body.split(' ');
-                let target = m.message.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
-                let amountStr = args.find(a => !a.includes('@') && a !== '.transfer' && a !== '.pay');
-                
-                if (!target || !amountStr) {
-                    return sock.sendMessage(from, { text: `⚠️ Uso: .transfer [cantidad] [@usuario]\nEj: .transfer 100 @Juan` }, { quoted: m });
+                // 5. Pagar y Guardar
+                if (!global.banco) global.banco = {};
+                if (!global.banco[userKey]) global.banco[userKey] = 0;
+
+                global.banco[userKey] += sueldo;
+                global.cooldowns[userKey].work = now;
+
+                if (typeof guardarJSON === 'function') {
+                    guardarJSON(rutaBanco, global.banco);
+                    // guardarJSON(rutaCooldowns, global.cooldowns);
                 }
 
-                // Traductor k/m
-                let amount = parseInt(amountStr.toLowerCase().replace(/k/g, '000').replace(/m/g, '000000'));
-                let senderKey = sender.split('@')[0];
-                let targetKey = target.split('@')[0];
-
-                if (isNaN(amount) || amount <= 0) return sock.sendMessage(from, { text: "⚠️ Cantidad inválida." }, { quoted: m });
-                if ((banco[senderKey] || 0) < amount) return sock.sendMessage(from, { text: "💸 No tienes suficiente dinero." }, { quoted: m });
-                if (senderKey === targetKey) return sock.sendMessage(from, { text: "⚠️ No puedes transferirte a ti mismo." }, { quoted: m });
-
-                // Transacción
-                banco[senderKey] -= amount;
-                banco[targetKey] = (banco[targetKey] || 0) + amount;
-                guardarJSON(rutaBanco, banco);
-
+                // 6. Mensaje Final
                 await sock.sendMessage(from, { 
-                    text: `✅ *TRANSFERENCIA EXITOSA*\n📤 De: @${senderKey}\n📥 Para: @${targetKey}\n💰 Monto: $${amount.toLocaleString()}`, 
-                    mentions: [sender, target] 
+                    text: `🔨 *${chamba.emoji} ¡TRABAJO TERMINADO!* \n\n${chamba.texto}: 💰 *$${sueldo.toLocaleString()}*\n\n🏦 *Nuevo Saldo:* $${global.banco[userKey].toLocaleString()}` 
                 }, { quoted: m });
-           break; }
 
-
-// ==========================================
-// 💰 COMANDO: ADDCOIN (SISTEMA INTELIGENTE)
-// ==========================================
-   switch (command) { case 'addcoin': case 'dar':
-    if (!esOwner) return sock.sendMessage(from, { text: '⛔ Solo para mi Creador.' }, { quoted: m });
-
-    // 1. Detectar Cantidad (Busca k/m en el texto)
-    let args = body.split(' ');
-    let amountStr = args.find(a => a.match(/^\d+(k|m)?$/i)); 
-    
-    if (!amountStr) {
-        return sock.sendMessage(from, { text: `⚠️ Escribe la cantidad.\nEj: .addcoin 10m (Para ti)\nEj: .addcoin 5k @usuario` }, { quoted: m });
-    }
-
-    // 2. Convertir cantidad (k=000, m=000000)
-    let amount = parseInt(amountStr.toLowerCase().replace(/k/g, '000').replace(/m/g, '000000'));
-
-    // 3. Detectar Objetivo (Mención > Respuesta > TÚ MISMO)
-    let target = m.message.extendedTextMessage?.contextInfo?.mentionedJid?.[0] || 
-                 m.message.extendedTextMessage?.contextInfo?.participant || 
-                 sender; // <--- ESTO ES LO QUE TE FALTABA
-
-    // 4. Obtener la ID numérica correcta
-    let userKey = target.split('@')[0];
-
-    // 5. Ejecutar transacción
-    banco[userKey] = (banco[userKey] || 0) + amount;
-    fs.writeFileSync('./banco.json', JSON.stringify(banco, null, 2));
-
-    await sock.sendMessage(from, { 
-        text: `✅ *TRANSACCIÓN EXITOSA*\n💰 *Añadido:* $${amount.toLocaleString()}\n👤 *Usuario:* @${userKey}\n💳 *Nuevo Saldo:* $${banco[userKey].toLocaleString()}`, 
-        mentions: [target] 
-    }, { quoted: m });
-break; }
-
-
-
-
-
-
-// ==========================================
-// 📲 COMANDO: APK DOWNLOADER (API DIRECTA)
-// ==========================================
-   switch (command) { case 'apk': case 'mod apk':
-    const text = body.split(' ').slice(1).join(' ').trim();
-    
-    if (!text) {
-        return sock.sendMessage(from, { text: `🍃 Ingresa el nombre. Ej: .apk WhatsApp` }, { quoted: m });
-    }
-
-    await sock.sendMessage(from, { react: { text: '🕒', key: m.key } });
-
-    try {
-        const { data } = await axios.get(`https://ws75.aptoide.com/api/7/apps/search?query=${text}&limit=1`);
-
-        if (!data || !data.datalist || !data.datalist.list || data.datalist.list.length === 0) {
-            return sock.sendMessage(from, { text: `❌ No encontré resultados para "${text}".` }, { quoted: m });
-        }
-
-        const app = data.datalist.list[0];
-
-        let txt = `*乂  ${ownerData.botName} - DESCARGAS  乂*\n\n`; 
-        txt += `≡ ▶️ *Nombre* : ${app.name}\n`;
-        txt += `≡ 📢 *Package* : ${app.package}\n`;
-        txt += `≡ 📌 *Versión* : ${app.vername}\n`;
-        txt += `≡ 🚀 *Peso* :  ${(app.size / 1048576).toFixed(2)} MB\n`;
-        txt += `≡ 👤 *Desarrollador* : ${app.developer.name}`;
-
-        await sock.sendMessage(from, { image: { url: app.icon }, caption: txt }, { quoted: m });
-
-        if (app.size > 900 * 1048576) { 
-            return sock.sendMessage(from, { text: `ꕥ El archivo es muy pesado (+900MB).` }, { quoted: m });
-        }
-
-        await sock.sendMessage(from, { 
-            document: { url: app.file.path }, 
-            mimetype: 'application/vnd.android.package-archive', 
-            fileName: `${app.name}.apk`,
-            caption: null 
-        }, { quoted: m });
-
-        await sock.sendMessage(from, { react: { text: '✔️', key: m.key } });
-
-    } catch (error) {
-        console.log(error);
-        await sock.sendMessage(from, { text: `❌ Error en la API de Aptoide.` }, { quoted: m });
-    }
-break; }
+            } break;
 
 
 
             // ==========================================
-            // 📌 COMANDO: PINTEREST (10 IMÁGENES - SIN ERROR)
+            // 💸 COMANDO: TRANSFER / PAY (TRANSFERENCIAS)
             // ==========================================
-             switch (command) { case 'pin': case 'pinterest':
-                const text = body.slice(body.indexOf(' ') + 1).trim();
-                if (body.split(' ').length < 2) return sock.sendMessage(from, { text: '❀ Dime qué buscar. Ej: .pin polnito' }, { quoted: m });
+            case 'pay': case 'transfer': case 'transferir': { 
+                const userKey = m.key.participant || m.key.remoteJid;
+
+                // 1. Detectar Destinatario (Mención)
+                let target = m.message.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
+                // 2. Detectar Cantidad (Busca el argumento que NO es una mención)
+                // Esto permite escribir ".pay 100 @user" o ".pay @user 100" indistintamente
+                let amountStr = args.find(a => !a.includes('@') && !isNaN(parseInt(a.replace(/k|m/g, ''))));
+
+                if (!target || !amountStr) {
+                    return sock.sendMessage(from, { 
+                        text: `💸 *SISTEMA BANCARIO*\n\n📝 Uso: *.pay [cantidad] [@usuario]*\n🔥 Ej: .pay 5k @Amigo` 
+                    }, { quoted: m });
+                }
+
+                let targetKey = target.split('@')[0];
+                let senderKey = userKey.split('@')[0];
+
+                // 3. Validaciones de Seguridad
+                if (target === userKey) return sock.sendMessage(from, { text: "⚠️ No puedes transferirte a ti mismo (Lavado de dinero detectado 🤨)." }, { quoted: m });
+
+                // 4. Parsear Cantidad (Soporte k/m)
+                let amount = parseInt(amountStr.toLowerCase().replace(/k/g, '000').replace(/m/g, '000000'));
+
+                if (isNaN(amount) || amount <= 0) return sock.sendMessage(from, { text: "⚠️ La cantidad debe ser un número positivo." }, { quoted: m });
+
+                // 5. Verificar Fondos (Global)
+                if (!global.banco) global.banco = {};
+                if (!global.banco[userKey]) global.banco[userKey] = 0;
+                // Inicializamos al destinatario por si es nuevo (para que no de NaN)
+                if (!global.banco[target]) global.banco[target] = 0;
+
+                if (global.banco[userKey] < amount) {
+                    return sock.sendMessage(from, { 
+                        text: `💸 *Fondos Insuficientes*\nTe faltan: $${(amount - global.banco[userKey]).toLocaleString()}` 
+                    }, { quoted: m });
+                }
+
+                // 6. EJECUTAR TRANSACCIÓN
+                global.banco[userKey] -= amount; // Restamos al que envía
+                global.banco[target] += amount;  // Sumamos al que recibe
+
+                // 7. Guardar Datos
+                if (typeof guardarJSON === 'function') guardarJSON(rutaBanco, global.banco);
+
+                // 8. Recibo de Transferencia
+                await sock.sendMessage(from, { 
+                    text: `✅ *TRANSFERENCIA EXITOSA*\n\n📤 *De:* @${senderKey}\n📥 *Para:* @${targetKey}\n💰 *Monto:* $${amount.toLocaleString()}\n\n🏦 *Tu Saldo:* $${global.banco[userKey].toLocaleString()}`, 
+                    mentions: [userKey, target] 
+                }, { quoted: m });
+
+            } break;
+
+
+
+
+            // ==========================================
+            // 💰 COMANDO: ADDCOIN V.FINAL (FORZADO LID)
+            // ==========================================
+            case 'addcoin': case 'dar': { 
+                // 1. SEGURIDAD (Usamos la variable 'esOwner' que ya tienes definida)
+                if (!esOwner) return sock.sendMessage(from, { text: '⛔ Solo mi Creador puede usar esto.' }, { quoted: m });
+
+                // 2. DETECTAR CANTIDAD
+                let argsLocal = body.split(' ');
+                let amountStr = argsLocal.find(a => a.match(/^\d+(k|m)?$/i)); 
+                
+                if (!amountStr) return sock.sendMessage(from, { text: `⚠️ Uso: .dar 10m` }, { quoted: m });
+
+                // Convertir k/m a ceros
+                let amount = parseInt(amountStr.toLowerCase().replace(/k/g, '000').replace(/m/g, '000000'));
+
+                // 3. DETERMINAR DESTINATARIO
+                let beneficiario;
+                let mention = m.message.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
+                
+                if (mention) {
+                    // Si etiquetas a alguien, se lo das a él
+                    beneficiario = mention.split('@')[0];
+                } else {
+                    // 🚨 SI NO ETIQUETAS A NADIE, VA DIRECTO A TU LID
+                    beneficiario = "191809682694179@lid"; 
+                }
+
+                // 4. TRANSACCIÓN (Usando global.banco como el resto de tus comandos)
+                if (!global.banco) global.banco = {};
+                
+                // Sumamos el dinero
+                global.banco[beneficiario] = (global.banco[beneficiario] || 0) + amount;
+
+                // 5. GUARDADO FÍSICO
+                fs.writeFileSync(rutaBanco, JSON.stringify(global.banco, null, 2));
+
+                // 6. RESPUESTA
+                await sock.sendMessage(from, { 
+                    text: `✅ *TRANSACCIÓN EXITOSA*\n\n💰 *Añadido:* $${amount.toLocaleString()}\n👤 *Cuenta:* @${beneficiario.split('@')[0]}\n💳 *Saldo Actual:* $${global.banco[beneficiario].toLocaleString()}`,
+                    mentions: [beneficiario.includes('@') ? beneficiario : beneficiario + '@s.whatsapp.net']
+                }, { quoted: m });
+
+            } break;
+
+
+
+
+            // ==========================================
+            // 📲 COMANDO: APK / MODAPK (DESCARGADOR PRO)
+            // ==========================================
+            case 'apk': case 'modapk': case 'app': { 
+                // 1. Validación de Entrada
+                // args.join(' ') toma todo el texto después del comando
+                const busqueda = args.join(' ');
+
+                if (!busqueda) {
+                    return sock.sendMessage(from, { 
+                        text: `📲 *APK DOWNLOADER*\n\n¿Qué aplicación buscas?\n📝 *Ej:* .apk WhatsApp\n📝 *Ej:* .apk Minecraft Mod` 
+                    }, { quoted: m });
+                }
+
+                // 2. Feedback de "Buscando"
+                await sock.sendMessage(from, { react: { text: "🔍", key: m.key } });
+                try {
+                    // 3. Consulta a la API (Aptoide)
+                    const { data } = await axios.get(`https://ws75.aptoide.com/api/7/apps/search?query=${encodeURIComponent(busqueda)}&limit=1`);
+
+                    // Verificar si hubo resultados
+                    if (!data || !data.datalist || !data.datalist.list || data.datalist.list.length === 0) {
+                        return sock.sendMessage(from, { text: `❌ No encontré resultados para: *"${busqueda}"*` }, { quoted: m });
+                    }
+
+                    const app = data.datalist.list[0];
+                    const sizeMB = (app.size / 1048576).toFixed(2); // Convertir bytes a MB
+
+                    // 4. Construcción de la Ficha Técnica
+                    let txt = `╭─── 〔 📲 *STORE APP* 〕 ───\n`;
+                    txt += `│ 🏷️ *Nombre:* ${app.name}\n`;
+                    txt += `│ 📦 *Package:* ${app.package}\n`;
+                    txt += `│ 🆚 *Versión:* ${app.vername}\n`;
+                    txt += `│ ⚖️ *Peso:* ${sizeMB} MB\n`;
+                    txt += `│ ⭐ *Rating:* ${app.stats.rating.avg.toFixed(1)}/5\n`;
+                    txt += `│ 📅 *Actualizado:* ${app.updated.split(' ')[0]}\n`;
+                    txt += `╰──────────────────────\n\n`;
+                    // 5. Verificación de Seguridad (Peso)
+                    // WhatsApp suele fallar enviando archivos de +100MB en bots simples.
+                    // Ponemos límite de 200MB para proteger la conexión de tu bot.
+                    if (app.size > 200 * 1048576) {
+                        txt += `⚠️ *El archivo es muy pesado (${sizeMB} MB).*\nWhatsApp no permite enviarlo por aquí.\n\n🔗 *Descárgalo directo:* \n${app.file.path}`;
+                        await sock.sendMessage(from, { 
+                            image: { url: app.icon }, 
+                            caption: txt 
+                        }, { quoted: m });
+                        return; // Detenemos aquí
+                    }
+
+                    txt += `🚀 *Descargando archivo... Por favor espera.*`;
+
+                    // Enviar ficha con foto
+                    await sock.sendMessage(from, { 
+                        image: { url: app.icon }, 
+                        caption: txt 
+                    }, { quoted: m });
+
+                    // 6. Enviar el Archivo (APK)
+                    await sock.sendMessage(from, { react: { text: "⬇️", key: m.key } });
+
+                    await sock.sendMessage(from, { 
+                        document: { url: app.file.path }, 
+                        mimetype: 'application/vnd.android.package-archive', 
+                        fileName: `${app.name}.apk`,
+                        caption: `🤖 *Descargado por ${ownerData.botName}*`
+                    }, { quoted: m });
+
+                    await sock.sendMessage(from, { react: { text: "✅", key: m.key } });
+
+                } catch (error) {
+                    console.log(error);
+                    await sock.sendMessage(from, { text: `❌ Error de conexión con la tienda.` }, { quoted: m });
+                }
+
+            } break;
+
+
+
+            // ==========================================
+            // 📌 COMANDO: PINTEREST (ORIGINAL + SHUFFLE + LÍMITE 6)
+            // ==========================================
+            case 'pin': case 'pinterest': {
+                // 1. Obtener texto de búsqueda
+                const text = args.join(" ");
+                
+                if (!text) return sock.sendMessage(from, { text: `🍃 Ingresa lo que buscas. Ej: .pin Gatos` }, { quoted: m });
 
                 await sock.sendMessage(from, { react: { text: "🕒", key: m.key } });
 
                 try {
-                    // 1. TU FUNCIÓN EXACTA (NO TOCADA)
+                    // ----------------------------------------------------
+                    // TU FUNCIÓN ORIGINAL (EXACTA)
+                    // ----------------------------------------------------
                     async function pinterestApi(query) {
-                        const link = `https://id.pinterest.com/resource/BaseSearchResource/get/?source_url=%2Fsearch%2Fpins%2F%3Fq%3D${encodeURIComponent(query)}%26rs%3Dtyped&data=%7B%22options%22%3A%7B%22applied_unified_filters%22%3Anull%2C%22appliedProductFilters%22%3A%22---%22%2C%22article%22%3Anull%2C%22auto_correction_disabled%22%3Afalse%2C%22corpus%22%3Anull%2C%22customized_rerank_type%22%3Anull%2C%22domains%22%3Anull%2C%22dynamicPageSizeExpGroup%22%3A%22control%22%2C%22filters%22%3Anull%2C%22journey_depth%22%3Anull%2C%22page_size%22%3Anull%2C%22price_max%22%3Anull%2C%22price_min%22%3Anull%2C%22query_pin_sigs%22%3Anull%2C%22query%22%3A%22${encodeURIComponent(query)}%22%2C%22redux_normalize_feed%22%3Atrue%2C%22request_params%22%3Anull%2C%22rs%22%3A%22typed%22%2C%22scope%22%3A%22pins%22%2C%22selected_one_bar_modules%22%3Anull%2C%22seoDrawerEnabled%22%3Afalse%2C%22source_id%22%3Anull%2C%22source_module_id%22%3Anull%2C%22source_url%22%3A%22%2Fsearch%2Fpins%2F%3Fq%3D${encodeURIComponent(query)}%22%2C%22top_pin_id%22%3Anull%2C%22top_pin_ids%22%3Anull%7D%2C%22context%22%3A%7B%7D%7D`;
-                        
+                        const link = `https://id.pinterest.com/resource/BaseSearchResource/get/?source_url=%2Fsearch%2Fpins%2F%3Fq%3D${encodeURIComponent(query)}&data=%7B%22options%22%3A%7B%22isPrefetch%22%3Afalse%2C%22query%22%3A%22${encodeURIComponent(query)}%22%2C%22scope%22%3A%22pins%22%2C%22no_correct%22%3Atrue%2C%22rows%22%3A50%7D%2C%22context%22%3A%7B%7D%7D`;
+
                         const headers = {
                             'accept': 'application/json, text/javascript, */*; q=0.01',
                             'accept-language': 'id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
                             'referer': 'https://id.pinterest.com/',
-                            'sec-ch-ua': '"Not(A:Brand";v="99", "Google Chrome";v="133", "Chromium";v="133")',
+                            'sec-ch-ua': '"Not(A:Brand";v="99", "Google Chrome";v="114", "Chromium";v="114"',
                             'sec-fetch-mode': 'cors',
                             'sec-fetch-site': 'same-origin',
-                            'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36',
+                            'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
                             'x-app-version': 'c056fb7',
                             'x-pinterest-appstate': 'active',
                             'x-pinterest-pws-handler': 'www/index.js',
@@ -1865,99 +2695,88 @@ break; }
                                     .map(item => item.images.orig.url);
                             }
                             return [];
-                        } catch (error) { 
+                        } catch (error) {
                             console.log("Error API Pinterest:", error.message);
-                            return []; 
+                            return [];
+                        }
+                    }
+                    // ----------------------------------------------------
+
+                    // 2. EJECUCIÓN MEJORADA
+                    let images = await pinterestApi(text);
+
+                    if (!images || images.length === 0) {
+                        return sock.sendMessage(from, { text: `❌ No encontré resultados para "${text}".` }, { quoted: m });
+                    }
+
+                    // 👉 AQUÍ ESTÁ LA MAGIA DEL SHUFFLE (MEZCLAR)
+                    // Baraja las fotos para que no salgan siempre las mismas al principio
+                    images = images.sort(() => 0.5 - Math.random());
+
+                    // 👉 AQUÍ ESTÁ EL LÍMITE DE 6 FOTOS
+                    const limit = Math.min(6, images.length);
+                    await sock.sendMessage(from, { text: `📌 *Pinterest:* ${text}\n🎲 *Enviando:* ${limit} imágenes aleatorias...` }, { quoted: m });
+
+                    for (let i = 0; i < limit; i++) {
+                        try {
+                            await sock.sendMessage(from, { image: { url: images[i] } }, { quoted: m });
+                            // Pequeña pausa de 1 segundo para evitar ban por spam
+                            await new Promise(r => setTimeout(r, 1000));
+                        } catch (e) {
+                            console.log("Saltando imagen con error...");
                         }
                     }
 
-                    // 2. EJECUCIÓN (SOLO CAMBIOS NECESARIOS)
-                    if (text.includes("https://")) {
-                        await sock.sendMessage(from, { text: "⚠️ Este comando es solo para búsqueda. Usa el botón de descarga de WhatsApp." }, { quoted: m });
-                    } else {
-                        const images = await pinterestApi(text);
-                        
-                        if (!images || images.length === 0) {
-                            return sock.sendMessage(from, { text: `❌ No encontré nada. Pinterest se puso difícil.` }, { quoted: m });
-                        }
-
-                        // CAMBIO: 5 -> 10 IMÁGENES
-                        const limit = Math.min(8, images.length);
-                        await sock.sendMessage(from, { text: `📌 *Resultados para:* "${text}"\nEnviando ${limit} imágenes...` }, { quoted: m });
-
-                        for (let i = 0; i < limit; i++) {
-                            // Pequeña protección para que si falla UNA foto, no se pare todo
-                            try {
-                                await sock.sendMessage(from, { image: { url: images[i] } });
-                                await new Promise(r => setTimeout(r, 1000));
-                            } catch (e) {
-                                console.log("Saltando imagen con error...");
-                            }
-                        }
-                        await sock.sendMessage(from, { react: { text: "✅", key: m.key } });
-                    }
+                    await sock.sendMessage(from, { react: { text: "✅", key: m.key } });
 
                 } catch (e) {
                     console.log(e);
-                    // CAMBIO: ELIMINADO EL MENSAJE DE ERROR AL CHAT
-                }
-           break; }
-
-
-
-            // ==========================================
-            // 🧪 COMANDO: PROBAR WELCOME (OWNER)
-            // ==========================================
-            if (body === '.probarwel') {
-                const esOwner = sender.includes("191809682694179") || sender.includes("526633147534");
-                if (!esOwner) return sock.sendMessage(from, { text: '⛔ Solo mi creador puede usar este comando de prueba.' }, { quoted: m });
-
-                await sock.sendMessage(from, { text: "🧪 *Iniciando prueba de sistemas de Bienvenida y Despedida...*" }, { quoted: m });
-
-                // --- Prueba Despedida (Welcome 1) ---
-                if (welcomeDB.files.length > 0) {
-                    const fIdx = Math.floor(Math.random() * welcomeDB.files.length);
-                    const media = welcomeDB.files[fIdx];
-                    let txt = `👋 *PRUEBA DESPEDIDA*\n🚪 Saliste de: Grupo de Prueba\n👥 Quedan: 0 miembros`;
-                    await sock.sendMessage(from, { [media.type]: fs.readFileSync(media.path), caption: txt, mentions: [sender] });
-                    
-                    if (welcomeDB.audios.length > 0) {
-                        const aIdx = Math.floor(Math.random() * welcomeDB.audios.length);
-                        await sock.sendMessage(from, { audio: fs.readFileSync(welcomeDB.audios[aIdx]), mimetype: 'audio/mp4', ptt: true });
-                    }
-                } else {
-                    await sock.sendMessage(from, { text: "⚠️ No hay archivos configurados para Despedida (.setwel)" });
+                    await sock.sendMessage(from, { text: `❌ Error interno.` }, { quoted: m });
                 }
 
-                // --- Prueba Bienvenida (Welcome 2) ---
-                if (welcome2DB.files.length > 0) {
-                    const fIdx2 = Math.floor(Math.random() * welcome2DB.files.length);
-                    const media2 = welcome2DB.files[fIdx2];
-                    let txt2 = `🌟 *PRUEBA BIENVENIDA*\n🏰 Entraste a: Grupo de Prueba\n👥 Somos ya: 1 miembros`;
-                    await sock.sendMessage(from, { [media2.type]: fs.readFileSync(media2.path), caption: txt2, mentions: [sender] });
-                    
-                    if (welcome2DB.audios.length > 0) {
-                        const aIdx2 = Math.floor(Math.random() * welcome2DB.audios.length);
-                        await sock.sendMessage(from, { audio: fs.readFileSync(welcome2DB.audios[aIdx2]), mimetype: 'audio/mp4', ptt: true });
-                    }
-                } else {
-                    await sock.sendMessage(from, { text: "⚠️ No hay archivos configurados para Bienvenida (.setwel2)" });
-                }
-            }
+            } break;
 
 
- } catch (e) { console.log("Error recuperado:", e); }
-    });
 
-// --- FUNCIONES NECESARIAS (NO BORRAR) ---
-const fetch = require('node-fetch');
-const cheerio = require('cheerio');
+            // Cierre del Switch
+            } 
+        } catch (e) { 
+            console.log("Error recuperado:", e); 
+        }
+    }); // Cierre del sock.ev.on('messages.upsert')
+} // <--- 🛑 ESTA LLAVE CIERRA LA FUNCIÓN iniciarBot()
 
+// ==========================================
+// 🛠️ FUNCIONES AUXILIARES (FUERA DE iniciarBot)
+// ==========================================
+
+// 1. Función de Limpieza Automática
+function autoLimpiarSistema() {
+    try {
+        const { exec } = require('child_process');
+        const basura = [
+            './*-player-script.js', 
+            './temp_*', 
+            './sticker_*', 
+            './*.mp4', 
+            './*.mp3', 
+            './*.jpg', 
+            './core.*'
+        ];
+        
+        basura.forEach(patron => {
+            exec(`rm -rf ${patron}`); 
+        });
+
+        console.log(`[${ownerData.botName}] 🧹 Mantenimiento automático ejecutado.`);
+    } catch (e) {}
+}
+
+// 2. Parsers y Scrapers (XNXX, Google, etc)
 function parseInfo(infoStr = '') {
     const lines = infoStr.split('\n').map(v => v.trim()).filter(Boolean);
     let dur = '', qual = '', views = '';
     if (lines.length > 0) {
-        // Lógica simple para extraer info
         const parts = lines.join(' ').split('-');
         qual = parts[0]?.trim();
         views = parts[1]?.trim();
@@ -1982,9 +2801,9 @@ async function xnxxdl(URL) {
     });
 }
 
-async function search(query) {
-    return new Promise((resolve, reject) => {
-        const baseurl = 'https://www.xnxx.com';
+async function searchXNXX(query) {
+   return new Promise((resolve, reject) => {
+      const baseurl = 'https://www.xnxx.com';
         fetch(`${baseurl}/search/${query}`).then(res => res.text()).then(res => {
             const $ = cheerio.load(res, { xmlMode: false });
             const results = [];
@@ -1998,87 +2817,23 @@ async function search(query) {
     });
 }
 
-    // ==========================================
-    // 🚪 DETECTOR DE EVENTOS PREMIUM (TODO EN UNO)
-    // ==========================================
-    sock.ev.on('group-participants.update', async (anu) => {
-        try {
-            const { id, participants, action } = anu;
-            const isRemove = action === 'remove';
-            const db = isRemove ? welcomeDB : welcome2DB;
-            
-            // Verificamos si está activado en este grupo
-            if (db.status[id]) {
-                const metadata = await sock.groupMetadata(id);
-                const descripcion = metadata.desc ? metadata.desc.toString().slice(0, 100) + "..." : "Sin descripción";
-                const fecha = new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-                const hora = new Date().toLocaleTimeString('es-ES');
-                
-                for (let item of participants) {
-                    // 🛡️ ARREGLO ANTI-CRASH: Extrae el ID correctamente
-                    const num = typeof item === 'object' ? item.id : item;
+async function bufferToData(stream) {
+    let buffer = Buffer.from([]);
+    for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+    return buffer;
+}
 
-                    let fIdx = db.files.length > 0 ? Math.floor(Math.random() * db.files.length) : -1;
-                    let aIdx = db.audios.length > 0 ? Math.floor(Math.random() * db.audios.length) : -1;
-                    
-                    // --- 🎨 DISEÑO 20X MEJORADO ---
-                    let txt = "";
-                    if (isRemove) {
-                        // 💀 MENSAJE DE DESPEDIDA
-                        txt = `╭─「 🕊️ *UN ADIÓS* 🕊️ 」\n` +
-                              `│\n` +
-                              `│ 👤 *Usuario:* @${num.split('@')[0]}\n` +
-                              `│ 🚪 *Se fue de:* ${metadata.subject}\n` +
-                              `│ 📅 *Fecha:* ${fecha}\n` +
-                              `│ ⏰ *Hora:* ${hora}\n` +
-                              `│\n` +
-                              `│ 🥀 _Un soldado ha caído..._\n` +
-                              `│ 👥 *Ahora somos:* ${metadata.participants.length} sobrevivientes.\n` +
-                              `│\n` +
-                              `╰───────────────────`;
-                    } else {
-                        // 🌟 MENSAJE DE BIENVENIDA
-                        txt = `╭─「 ✨ *NUEVO MIEMBRO* ✨ 」\n` +
-                              `│\n` +
-                              `│ 👋 *Hola:* @${num.split('@')[0]}\n` +
-                              `│ 🏰 *Bienvenido a:* ${metadata.subject}\n` +
-                              `│\n` +
-                              `│ 📅 *Fecha:* ${fecha}\n` +
-                              `│ ⏰ *Hora:* ${hora}\n` +
-                              `│ 👥 *Miembro N°:* ${metadata.participants.length}\n` +
-                              `│\n` +
-                              `│ 📝 *Descripción del Grupo:*\n` +
-                              `│ _${descripcion}_\n` +
-                              `│\n` +
-                              `│ 🛡️ _Lee las reglas para evitar el ban._\n` +
-                              `│\n` +
-                              `╰───────────────────`;
-                    }
+// ==========================================
+// 🚀 ARRANQUE DEL SISTEMA
+// ==========================================
 
-                    // Enviar Foto/Video si existe
-                    if (fIdx !== -1) {
-                        const media = db.files[fIdx];
-                        await sock.sendMessage(id, { [media.type]: fs.readFileSync(media.path), caption: txt, mentions: [num] });
-                    } else {
-                        await sock.sendMessage(id, { text: txt, mentions: [num] });
-                    }
+// 1. Limpieza inicial (segundo plano)
+autoLimpiarSistema();
 
-                    // Enviar Audio si existe
-                    if (aIdx !== -1) {
-                        await sock.sendMessage(id, { audio: fs.readFileSync(db.audios[aIdx]), mimetype: 'audio/mp4', ptt: true });
-                    }
-                }
-            }
-        } catch (e) {
-            console.log("Error en bienvenida/despedida:", e);
-        }
-    }); 
+// 2. Encendido del Bot
+iniciarBot(); 
 
 
-
-} // <- Esta llave cierra la función "async function iniciarBot()"
-
-iniciarBot(); // <- Esta línea arranca todo el proceso
 
 
 
