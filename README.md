@@ -28,16 +28,19 @@ Sigue estos pasos exactos para instalar el bot en tu celular:
    pkg update && pkg upgrade -y
 
 2. clona el repositorio: 
-```
-git clone [https://github.com/cristofercarrasco4020-svg/VICTORTAS-MD.git](https://github.com/cristofercarrasco4020-svg/VICTORTAS-MD.git)```
+```bash
+git clone [https://github.com/cristofercarrasco4020-svg/VICTORTAS-MD.git](https://github.com/cristofercarrasco4020-svg/VICTORTAS-MD.git)
 
-4. entra ala carpeta 
+4. entra ala carpeta: 
+```bash
 cd VICTORTAS-MD
 
 5. instala modulos:
-npm install
+```bash
+npminstall
 
 6. inicia el bot:
+```bash
 sh start.sh
 
 
