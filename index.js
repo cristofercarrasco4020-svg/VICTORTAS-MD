@@ -591,19 +591,24 @@ const msToTime = (duration) => {
 // ☁️ COMANDO: SUBIR ACTUALIZACIÓN (FINAL)
 // ==========================================
 case 'subiractu':
-    if (!esOwner) return;
+    if (!esOwner) return; // Seguridad Owner activa [cite: 2026-02-02]
 
-    await sock.sendMessage(from, { text: '☁️ *Sincronizando con GitHub...*' });
+    await sock.sendMessage(from, { text: '☁️ *Verificando cambios...*' });
 
-    // Cambiamos 'principal' por 'main' para que coincida con GitHub
-    exec('git add . && git commit -m "Auto-Update Bot" && git push origin main', (error, stdout, stderr) => {
-        if (error) {
-            if (error.message.includes('nothing to commit')) {
-                return sock.sendMessage(from, { text: '⚠️ No hay cambios nuevos.' });
-            }
-            return sock.sendMessage(from, { text: '❌ Error: ' + error.message });
+    // 1. Verificamos si hay algo nuevo antes de intentar subir
+    exec('git status --porcelain', (err, stdout) => {
+        if (!stdout) {
+            return sock.sendMessage(from, { text: '⚠️ *No hay cambios nuevos para subir.* \nTu código ya está igual que en GitHub.' });
         }
-        sock.sendMessage(from, { text: '✅ ¡CÓDIGO EN LA NUBE! Rama: main' });
+
+        // 2. Si hay cambios, procedemos con la subida
+        sock.sendMessage(from, { text: '☁️ *Subiendo actualización...*' });
+        exec('git add . && git commit -m "Auto-Update Bot" && git push origin main', (error) => {
+            if (error) {
+                return sock.sendMessage(from, { text: '❌ *Error técnico:* \n' + error.message });
+            }
+            sock.sendMessage(from, { text: '✅ *¡CÓDIGO ACTUALIZADO EN GITHUB!*' });
+        });
     });
 break;
 
