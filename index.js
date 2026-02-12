@@ -587,35 +587,25 @@ const msToTime = (duration) => {
 
 
 
-            // ==========================================
-            // ☁️ COMANDO: SUBIR ACTUALIZACIÓN (CORREGIDO)
-            // ==========================================
-            case 'subiractu':
-                // Validación de Owner
-                if (!esOwner) {
-                    return sock.sendMessage(from, { text: `⛔ Solo el equipo de dueños de ${ownerData.botName} puede usar esto.` }, { quoted: m });
-                }
+// ==========================================
+// ☁️ COMANDO: SUBIR ACTUALIZACIÓN (FINAL)
+// ==========================================
+case 'subiractu':
+    if (!esOwner) return;
 
-                await sock.sendMessage(from, { text: '☁️ *Sincronizando con GitHub...*\n_Esto puede tardar unos segundos._' }, { quoted: m });
+    await sock.sendMessage(from, { text: '☁️ *Sincronizando con GitHub...*' });
 
-                // CORRECCIÓN: Cambiamos 'principal' por 'main' y agregamos 'git pull' al inicio
-                // Orden lógico: 1. Bajar cambios (pull) -> 2. Agregar archivos (add) -> 3. Guardar (commit) -> 4. Subir (push)
-                exec('git pull origin main && git add . && git commit -m "Auto-Update Bot" && git push origin main', (error, stdout, stderr) => {
-
-                    if (error) {
-                        // Filtramos el error común de "nada que commitear" para que no asuste
-                        if (error.message.includes('nothing to commit')) {
-                            return sock.sendMessage(from, { text: '⚠️ *No hay cambios nuevos que subir.*\nTodo está actualizado.' }, { quoted: m });
-                        }
-                        // Error real
-                        return sock.sendMessage(from, { text: '❌ *Error técnico:*\n' + error.message }, { quoted: m });
-                    }
-
-                    sock.sendMessage(from, {
-                        text: `✅ *¡SUBIDA EXITOSA!* ☁️\n\nEl código ha sido guardado en la rama 'main'.\nAhora puedes usar *.actualizar* en otros dispositivos.`
-                    }, { quoted: m });
-                });
-            break;
+    // Cambiamos 'principal' por 'main' para que coincida con GitHub
+    exec('git add . && git commit -m "Auto-Update Bot" && git push origin main', (error, stdout, stderr) => {
+        if (error) {
+            if (error.message.includes('nothing to commit')) {
+                return sock.sendMessage(from, { text: '⚠️ No hay cambios nuevos.' });
+            }
+            return sock.sendMessage(from, { text: '❌ Error: ' + error.message });
+        }
+        sock.sendMessage(from, { text: '✅ ¡CÓDIGO EN LA NUBE! Rama: main' });
+    });
+break;
 
 
 
