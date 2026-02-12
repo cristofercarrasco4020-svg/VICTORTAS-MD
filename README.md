@@ -32,22 +32,18 @@ Sigue estos pasos exactos para instalar el bot en tu celular:
    git clone https://github.com/cristofercarrasco4020-svg/VICTORTAS-MD.git
    ```
 
-3.entra ala carpeta:
+
+3. entra ala carpeta: 
 ```
 cd VICTORTAS-MD
 ```
 
-4. entra ala carpeta: 
-```
-cd VICTORTAS-MD
-```
-
-5. instala modulos:
+4. instala modulos:
 ```
 npminstall
 ```
 
-6. inicia el bot:
+5. inicia el bot:
 ```
 sh start.sh
 ```
@@ -59,12 +55,12 @@ sh start.sh
 ​Instala Git y FFmpeg.
 ​Abre una terminal y ejecuta:
 ​<!-- end list -->
-
+```
 git clone [https://github.com/cristofercarrasco4020-svg/VICTORTAS-MD.git](https://github.com/cristofercarrasco4020-svg/VICTORTAS-MD.git)
 cd VICTORTAS-MD
 npm install
 npm start
-
+```
 ⚙️ Configuración
 ​Para personalizar el bot, edita el archivo config.js (o index.js):
 ​Owner Name: Criss
