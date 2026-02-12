@@ -599,7 +599,8 @@ const msToTime = (duration) => {
                 await sock.sendMessage(from, { text: '☁️ *Subiendo cambios a GitHub...* \n_Por favor espera._' }, { quoted: m });
 
                 // Ejecuta el proceso de subida
-                exec('git add . && git commit -m "Actualización vía Bot" && git push origin main', (error, stdout, stderr) => {
+               exec('git add . && git commit -m "Actualización vía Bot" && git push origin principal', (error, stdout, stderr) => {
+
                     if (error) {
                         return sock.sendMessage(from, { text: '❌ *Error en la subida:*\n' + error.message }, { quoted: m });
                     }
