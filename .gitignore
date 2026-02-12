@@ -1,3 +1,12 @@
+node_modules/
+sesion_propia/
+auth_info_baileys/
+banco.json
+inventario.json
+config.json
+.DS_Store
+
+
 sesion_propia/
 node_modules/
 *-jugador-script.js
