@@ -40,7 +40,7 @@ cd VICTORTAS-MD
 
 4. instala modulos:
 ```
-npminstall
+npm install
 ```
 
 5. inicia el bot:
