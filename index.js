@@ -588,25 +588,31 @@ const msToTime = (duration) => {
 
 
             // ==========================================
-            // ☁️ COMANDO: SUBIR ACTUALIZACIÓN (OWNER)
+            // ☁️ COMANDO: SUBIR ACTUALIZACIÓN (CORREGIDO)
             // ==========================================
             case 'subiractu':
-                // Usamos la seguridad global 'esOwner'
+                // Validación de Owner
                 if (!esOwner) {
                     return sock.sendMessage(from, { text: `⛔ Solo el equipo de dueños de ${ownerData.botName} puede usar esto.` }, { quoted: m });
                 }
 
-                await sock.sendMessage(from, { text: '☁️ *Subiendo cambios a GitHub...* \n_Por favor espera._' }, { quoted: m });
+                await sock.sendMessage(from, { text: '☁️ *Sincronizando con GitHub...*\n_Esto puede tardar unos segundos._' }, { quoted: m });
 
-                // Ejecuta el proceso de subida
-               exec('git add . && git commit -m "Actualización vía Bot" && git push origin principal', (error, stdout, stderr) => {
+                // CORRECCIÓN: Cambiamos 'principal' por 'main' y agregamos 'git pull' al inicio
+                // Orden lógico: 1. Bajar cambios (pull) -> 2. Agregar archivos (add) -> 3. Guardar (commit) -> 4. Subir (push)
+                exec('git pull origin main && git add . && git commit -m "Auto-Update Bot" && git push origin main', (error, stdout, stderr) => {
 
                     if (error) {
-                        return sock.sendMessage(from, { text: '❌ *Error en la subida:*\n' + error.message }, { quoted: m });
+                        // Filtramos el error común de "nada que commitear" para que no asuste
+                        if (error.message.includes('nothing to commit')) {
+                            return sock.sendMessage(from, { text: '⚠️ *No hay cambios nuevos que subir.*\nTodo está actualizado.' }, { quoted: m });
+                        }
+                        // Error real
+                        return sock.sendMessage(from, { text: '❌ *Error técnico:*\n' + error.message }, { quoted: m });
                     }
-                    
-                    sock.sendMessage(from, { 
-                        text: `✅ *¡CÓDIGO ACTUALIZADO!* ☁️\n\nLos cambios ya están en la nube.\n\nLos demás owners ya pueden usar:\n👉 *.actualizar*` 
+
+                    sock.sendMessage(from, {
+                        text: `✅ *¡SUBIDA EXITOSA!* ☁️\n\nEl código ha sido guardado en la rama 'main'.\nAhora puedes usar *.actualizar* en otros dispositivos.`
                     }, { quoted: m });
                 });
             break;
